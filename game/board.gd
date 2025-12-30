@@ -2,8 +2,8 @@ extends Node2D
 
 const ROWS := 20
 const COLS := 10
-const CELL_SIZE := 32
-const BIAS := Vector2i(5, 5)
+const CELL_SIZE := 50
+const BIAS := Vector2i(200, 5)
 
 const TYPE = [
 	[ Vector2i(0, -1), Vector2i(0, 0), Vector2i(0, 1), Vector2i(0, 2)   ], # I
@@ -54,6 +54,7 @@ var verti_dir := 0
 var verti_time := 0.0
 var spin_dir := 0
 var spin_time := 0.0
+var ghost_pos = Vector2i(0, 0)
 
 func _draw() -> void:
 	for y in range(ROWS):
@@ -80,17 +81,29 @@ func _draw() -> void:
 	
 	for c in cells:
 		var cp = pos + c
-		if cp.x < 0:
-			continue
-		draw_rect(
-			Rect2(
-				BIAS.x + cp.y * CELL_SIZE,
-				BIAS.y + cp.x * CELL_SIZE,
-				CELL_SIZE,
-				CELL_SIZE
-			),
-			COLOR[type]
-		)
+		if cp.x >= 0:
+			draw_rect(
+				Rect2(
+					BIAS.x + cp.y * CELL_SIZE,
+					BIAS.y + cp.x * CELL_SIZE,
+					CELL_SIZE,
+					CELL_SIZE
+				),
+				COLOR[type]
+			)
+		var gcp = ghost_pos + c
+		if gcp.x >= 0:
+			var color = COLOR[type]
+			color.a = 0.4
+			draw_rect(
+				Rect2(
+					BIAS.x + gcp.y * CELL_SIZE,
+					BIAS.y + gcp.x * CELL_SIZE,
+					CELL_SIZE,
+					CELL_SIZE
+				),
+				color
+			)
 
 # Called when the node enters the scene tree for the first time.
 func _ready():
@@ -124,6 +137,7 @@ func _process(delta):
 		if spin_time <= 0:
 			Rotate(spin_dir)
 			spin_time = BUTTON_REPEAT
+	Ghost()
 	queue_redraw()
 	
 func _input(e):
@@ -183,6 +197,7 @@ func Fall() -> void:
 		for c in cells:
 			var cp = pos + c
 			grid[cp.x][cp.y] = COLOR[type]
+		Eliminate_Line()
 		pos = Vector2i(0, 5)
 		#type = randi_range(0, 6)
 		type = (type + 1) % 7
@@ -230,3 +245,37 @@ func Hard_Drop() -> void:
 		pos.x += 1
 	pos.x -= 1
 	timer = DROP_TIME
+	
+func Ghost() -> void:
+	ghost_pos = pos
+	while not Collide(ghost_pos, cells):
+		ghost_pos.x += 1
+	ghost_pos.x -= 1
+	
+func Eliminate_Line():
+	for y in range(ROWS):
+		var is_full_line = true
+		for x in range(COLS):
+			if grid[y][x] == null:
+				is_full_line = false
+		if is_full_line:
+			for x in COLS:
+				grid[y][x] = null
+	
+	for y in range(ROWS - 1, -1, -1):
+		var ny = y + 1
+		while ny < ROWS:
+			var is_empty_line = true
+			for x in range(COLS):
+				if grid[ny][x] != null:
+					is_empty_line = false
+			if not is_empty_line:
+				break
+			ny += 1
+		ny -= 1
+		if ny == y:
+			continue
+		var temp = grid[y]
+		grid[y] = grid[ny]
+		grid[ny] = temp
+	
