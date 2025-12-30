@@ -2,7 +2,7 @@ extends Node2D
 
 const ROWS := 20
 const COLS := 10
-const CELL_SIZE := 50
+const CELL_SIZE := 32
 const BIAS := Vector2i(5, 5)
 
 const TYPE = [
@@ -16,10 +16,10 @@ const TYPE = [
 ]
 
 const TABLE = [
-	[ Vector2i(0, 0), Vector2i(0, 0), Vector2i(0, 0), Vector2i(0, 0), Vector2i(0, 0)     ], # 0
-	[ Vector2i(0, 0), Vector2i(0, 1), Vector2i(1, 1), Vector2i(-2, 0), Vector2i(-2, 1)   ], # R
-	[ Vector2i(0, 0), Vector2i(0, 0), Vector2i(0, 0), Vector2i(0, 0), Vector2i(0, 0)     ], # 2
-	[ Vector2i(0, 0), Vector2i(0, -1), Vector2i(1, -1), Vector2i(-2, 0), Vector2i(-2, 1) ]  # L
+	[ Vector2i(0, 0), Vector2i(0, 0), Vector2i(0, 0), Vector2i(0, 0), Vector2i(0, 0)      ], # 0
+	[ Vector2i(0, 0), Vector2i(0, 1), Vector2i(1, 1), Vector2i(-2, 0), Vector2i(-2, 1)    ], # R
+	[ Vector2i(0, 0), Vector2i(0, 0), Vector2i(0, 0), Vector2i(0, 0), Vector2i(0, 0)      ], # 2
+	[ Vector2i(0, 0), Vector2i(0, -1), Vector2i(1, -1), Vector2i(-2, 0), Vector2i(-2, -1) ]  # L
 ]
 
 const TABLE_I = [
@@ -132,6 +132,7 @@ func _input(e):
 	elif e.is_action_pressed("ui_left"):
 		horiz_dir = -1
 		horiz_time = BUTTON_DELAY
+		timer = 0.0
 		Move(-1)
 	elif e.is_action_released("ui_left"):
 		if horiz_dir == -1:
@@ -139,6 +140,7 @@ func _input(e):
 	elif e.is_action_pressed("ui_right"):
 		horiz_dir = 1
 		horiz_time = BUTTON_DELAY
+		timer = 0.0
 		Move(1)
 	elif e.is_action_released("ui_right"):
 		if horiz_dir == 1:
@@ -146,6 +148,7 @@ func _input(e):
 	elif e.is_action_pressed("ui_down"):
 		verti_dir = 1
 		verti_time = BUTTON_DELAY
+		timer = 0.0
 		Drop()
 	elif e.is_action_released("ui_down"):
 		if verti_dir == 1:
@@ -153,6 +156,7 @@ func _input(e):
 	elif e.is_action_pressed("x"):
 		spin_dir = 1
 		spin_time = BUTTON_DELAY
+		timer = 0.0
 		Rotate(1)
 	elif e.is_action_released("x"):
 		if spin_dir == 1:
@@ -160,6 +164,7 @@ func _input(e):
 	elif e.is_action_pressed("z"):
 		spin_dir = -1
 		spin_time = BUTTON_DELAY
+		timer = 0.0
 		Rotate(-1)
 	elif e.is_action_released("z"):
 		if spin_dir == -1:
@@ -179,7 +184,9 @@ func Fall() -> void:
 			var cp = pos + c
 			grid[cp.x][cp.y] = COLOR[type]
 		pos = Vector2i(0, 5)
-		type = randi_range(0, 6)
+		#type = randi_range(0, 6)
+		type = (type + 1) % 7
+		dir = 0
 		cells = TYPE[type]
 	else:
 		pos = new_pos
