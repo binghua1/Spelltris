@@ -40,12 +40,16 @@ const COLOR = [Color.CYAN, Color.BLUE, Color.ORANGE, Color.YELLOW, Color.GREEN, 
 
 const BUTTON_DELAY := 0.25
 const BUTTON_REPEAT := 0.04
+const LOCK_DELAY := 0.5
+const OPERATION_LIMIT := 15
 
-const show_next = 5
+
+const show_next := 5
 
 var grid := []
 var cells := []
-var timer := 0.0
+var drop_timer := 0.0
+var lock_timer := 0.0
 var DROP_TIME := 0.7
 var pos := Vector2i(0, 0)
 var dir := 0
@@ -56,13 +60,17 @@ var verti_dir := 0
 var verti_time := 0.0
 var spin_dir := 0
 var spin_time := 0.0
-var ghost_pos = Vector2i(0, 0)
+var ghost_pos := Vector2i(0, 0)
 
-var seven_bag := []
+var seven_bag = []
 var rng
 var rng_seed = 114514
 var hold = null
 var is_holded = false
+var op_times = 0
+var is_on_ground = false
+
+var gaming = true
 
 func Cell(p, b=Vector2i(0, 0)) -> Rect2:
 	return Rect2(BIAS.x + b.x + p.y * CELL_SIZE, BIAS.y + b.y + p.x * CELL_SIZE, CELL_SIZE, CELL_SIZE)
@@ -126,99 +134,124 @@ func _draw() -> void:
 				b.x -= CELL_SIZE / 2.0
 			b += Vector2i(CELL_SIZE * (COLS + 5), CELL_SIZE * i * 3 - (area.y - CELL_SIZE * 3) / 2.0)
 			draw_rect(Cell(c, b), COLOR[seven_bag[i]])
-
-# Called when the node enters the scene tree for the first time.
-func _ready():
+			
+func Reset() -> void:
+	grid = []
 	for y in range(ROWS):
 		grid.append([])
 		for x in range(COLS):
 			grid[y].append(null)
 	rng = RandomNumberGenerator.new()
 	rng.seed = rng_seed
+	seven_bag = []
 	Spawn()
 	hold = null
+	gaming = true
+	op_times = 0
+	is_on_ground = false
 
+func _ready():
+	Reset()
 
-# Called every frame. 'delta' is the elapsed time since the previous frame.
 func _process(delta):
-	timer += delta
-	if timer > DROP_TIME:
-		Fall()
-		timer = 0
-	if horiz_dir != 0:
-		horiz_time -= delta
-		if horiz_time <= 0:
-			Move(horiz_dir)
-			horiz_time = BUTTON_REPEAT
-	if verti_dir != 0:
-		verti_time -= delta
-		if verti_time <= 0:
-			Drop()
-			verti_time = BUTTON_REPEAT
-	if spin_dir != 0:
-		spin_time -= delta
-		if spin_time <= 0:
-			Rotate(spin_dir)
-			spin_time = BUTTON_REPEAT
-	Ghost()
-	queue_redraw()
+	if gaming:
+		drop_timer += delta
+		if drop_timer > DROP_TIME:
+			Fall()
+			drop_timer = 0
+		if horiz_dir != 0:
+			horiz_time -= delta
+			if horiz_time <= 0:
+				Move(horiz_dir)
+				horiz_time = BUTTON_REPEAT
+		if verti_dir != 0:
+			verti_time -= delta
+			if verti_time <= 0:
+				Drop()
+				verti_time = BUTTON_REPEAT
+		if spin_dir != 0:
+			spin_time -= delta
+			if spin_time <= 0:
+				Rotate(spin_dir)
+				spin_time = BUTTON_REPEAT
+		if is_on_ground:
+			lock_timer -= delta
+			if lock_timer <= 0:
+				Lock()
+		Ghost()
 	
+	queue_redraw()
+
 func _input(e):
-	if e.is_action_pressed("SPACE"):
-		Hard_Drop()
-	elif e.is_action_pressed("ui_left"):
-		horiz_dir = -1
-		horiz_time = BUTTON_DELAY
-		timer = 0.0
-		Move(-1)
-	elif e.is_action_released("ui_left"):
-		if horiz_dir == -1:
-			horiz_dir = 0
-	elif e.is_action_pressed("ui_right"):
-		horiz_dir = 1
-		horiz_time = BUTTON_DELAY
-		timer = 0.0
-		Move(1)
-	elif e.is_action_released("ui_right"):
-		if horiz_dir == 1:
-			horiz_dir = 0
-	elif e.is_action_pressed("ui_down"):
-		verti_dir = 1
-		verti_time = BUTTON_DELAY
-		timer = 0.0
-		Drop()
-	elif e.is_action_released("ui_down"):
-		if verti_dir == 1:
-			verti_dir = 0
-	elif e.is_action_pressed("x"):
-		spin_dir = 1
-		spin_time = BUTTON_DELAY
-		timer = 0.0
-		Rotate(1)
-	elif e.is_action_released("x"):
-		if spin_dir == 1:
-			spin_dir = 0
-	elif e.is_action_pressed("z"):
-		spin_dir = -1
-		spin_time = BUTTON_DELAY
-		timer = 0.0
-		Rotate(-1)
-	elif e.is_action_released("z"):
-		if spin_dir == -1:
-			spin_dir = 0
-	elif e.is_action_pressed("c"):
-		if not is_holded:
-			if hold == null:
-				hold = type
-				Spawn()
-			else:
-				var temp = type
-				type = hold
-				hold = temp
-				pos = Vector2i(0, 5)
-				dir = 0
-				cells = TYPE[type]
-			is_holded = true
+	if gaming:
+		if e.is_action_pressed("SPACE"):
+			Hard_Drop()
+		elif e.is_action_pressed("ui_left"):
+			horiz_dir = -1
+			horiz_time = BUTTON_DELAY
+			if is_on_ground and op_times < OPERATION_LIMIT:
+				lock_timer = LOCK_DELAY
+				op_times += 1
+			Move(-1)
+		elif e.is_action_released("ui_left"):
+			if horiz_dir == -1:
+				horiz_dir = 0
+		elif e.is_action_pressed("ui_right"):
+			horiz_dir = 1
+			horiz_time = BUTTON_DELAY
+			if is_on_ground and op_times < OPERATION_LIMIT:
+				lock_timer = LOCK_DELAY
+				op_times += 1
+			Move(1)
+		elif e.is_action_released("ui_right"):
+			if horiz_dir == 1:
+				horiz_dir = 0
+		elif e.is_action_pressed("ui_down"):
+			verti_dir = 1
+			verti_time = BUTTON_DELAY
+			Drop()
+		elif e.is_action_released("ui_down"):
+			if verti_dir == 1:
+				verti_dir = 0
+		elif e.is_action_pressed("x") or e.is_action_pressed("ui_up"):
+			spin_dir = 1
+			spin_time = BUTTON_DELAY
+			if is_on_ground and op_times < OPERATION_LIMIT:
+				lock_timer = LOCK_DELAY
+				op_times += 1
+			Rotate(1)
+		elif e.is_action_released("x") or e.is_action_released("ui_up"):
+			if spin_dir == 1:
+				spin_dir = 0
+		elif e.is_action_pressed("z"):
+			spin_dir = -1
+			spin_time = BUTTON_DELAY
+			if is_on_ground and op_times < OPERATION_LIMIT:
+				lock_timer = LOCK_DELAY
+				op_times += 1
+			Rotate(-1)
+		elif e.is_action_released("z"):
+			if spin_dir == -1:
+				spin_dir = 0
+		elif e.is_action_pressed("c"):
+			if not is_holded:
+				if hold == null:
+					hold = type
+					Spawn()
+				else:
+					var temp = type
+					type = hold
+					hold = temp
+					pos = Vector2i(0, 5)
+					dir = 0
+					cells = TYPE[type]
+					op_times = 0
+					is_on_ground = OnGround()
+					if Collide(pos, cells):
+						gaming = false
+				is_holded = true
+	if e.is_action_pressed("r"):
+		Reset()
 		
 func Random_Shuffle(arr, _seed) -> Array:
 	var RNG = RandomNumberGenerator.new()
@@ -241,6 +274,10 @@ func Spawn()-> void:
 	dir = 0
 	cells = TYPE[type]
 	is_holded = false
+	op_times = 0
+	is_on_ground = OnGround()
+	if Collide(pos, cells):
+		gaming = false
 
 func Collide(new_p, new_cells) -> bool:
 	for c in new_cells:
@@ -249,16 +286,23 @@ func Collide(new_p, new_cells) -> bool:
 			return true
 	return false
 	
-func Fall() -> void:
+func OnGround() -> bool:
 	var new_pos = pos + Vector2i(1, 0)
-	if (Collide(new_pos, cells)):
-		for c in cells:
-			var cp = pos + c
-			grid[cp.x][cp.y] = COLOR[type]
-		Eliminate_Line()
-		Spawn()
-	else:
-		pos = new_pos
+	return Collide(new_pos, cells)
+	
+func Lock() -> void:
+	for c in cells:
+		var cp = pos + c
+		grid[cp.x][cp.y] = COLOR[type]
+	Eliminate_Line()
+	Spawn()
+	
+func Fall() -> void:
+	if not OnGround():
+		pos.x += 1
+		is_on_ground = OnGround()
+		if is_on_ground:
+			lock_timer = LOCK_DELAY
 		
 func Move(d) -> void:
 	var new_pos = pos
@@ -293,12 +337,16 @@ func Drop() -> void:
 	next_pos.x += 1
 	if not Collide(next_pos, cells):
 		pos = next_pos
+	if OnGround() and not is_on_ground:
+		is_on_ground = true
+		lock_timer = LOCK_DELAY
+		
 	
 func Hard_Drop() -> void:
 	while not Collide(pos, cells):
 		pos.x += 1
 	pos.x -= 1
-	timer = DROP_TIME
+	Lock()
 	
 func Ghost() -> void:
 	ghost_pos = pos
