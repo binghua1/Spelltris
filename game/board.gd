@@ -156,6 +156,8 @@ func _ready():
 func _process(delta):
 	if gaming:
 		drop_timer += delta
+		DROP_TIME = 0.7 - op_times * 0.05
+		print(DROP_TIME)
 		if drop_timer > DROP_TIME:
 			Fall()
 			drop_timer = 0
