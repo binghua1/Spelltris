@@ -160,7 +160,7 @@ func _input(event):
 	if event.is_action_pressed("ui_left"): move(0, -1)
 	if event.is_action_pressed("ui_right"): move(0, 1)
 	if event.is_action_pressed("ui_down"): move(1, 0)
-	if event.is_action_pressed("ui_up"): rotate_piece(1)
+	if event.is_action_pressed("ui_up") or event.is_action_pressed("ui_x"): rotate_piece(1)
 	if event.is_action_pressed("ui_accept"): hard_drop() # Space 鍵 (ui_accept 預設包含 Space)
 	if event.is_action_pressed("ui_z"): rotate_piece(-1) # Z 鍵逆時針 (需在 Input Map 設定 ui_z)
 
