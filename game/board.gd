@@ -174,6 +174,13 @@ func _process(delta):
 			if spin_time <= 0:
 				Rotate(spin_dir)
 				spin_time = BUTTON_REPEAT
+				
+		if OnGround():
+			if not is_on_ground:
+				is_on_ground = true
+				lock_timer = 0.0
+		else:
+			is_on_ground = false
 		if is_on_ground:
 			lock_timer += delta
 			if lock_timer > LOCK_DELAY - 0.03 * op_times:
@@ -299,9 +306,6 @@ func Lock() -> void:
 func Fall() -> void:
 	if not OnGround():
 		pos.x += 1
-		is_on_ground = OnGround()
-		if is_on_ground:
-			lock_timer = 0.0
 		
 func Move(d) -> void:
 	var new_pos = pos
@@ -336,9 +340,6 @@ func Drop() -> void:
 	next_pos.x += 1
 	if not Collide(next_pos, cells):
 		pos = next_pos
-	if OnGround() and not is_on_ground:
-		is_on_ground = true
-		lock_timer = 0.0
 		
 	
 func Hard_Drop() -> void:
