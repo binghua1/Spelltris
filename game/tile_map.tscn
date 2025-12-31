@@ -1,0 +1,106 @@
+[gd_scene load_steps=9 format=3 uid="uid://bi4hnste6sowy"]
+
+[ext_resource type="Script" uid="uid://bqnc2mmat6tr" path="res://gsme.gd" id="1_03na7"]
+[ext_resource type="Texture2D" uid="uid://dkoqa1wuoab6e" path="res://tilemap.png" id="1_7yhko"]
+[ext_resource type="Texture2D" uid="uid://cl07tag1dxweu" path="res://block.png" id="2_1n30v"]
+[ext_resource type="Texture2D" uid="uid://cmsunywnrf3cr" path="res://icon.svg" id="3_35kre"]
+
+[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_03na7"]
+texture = ExtResource("1_7yhko")
+0:0/0 = 0
+1:0/0 = 0
+2:0/0 = 0
+3:0/0 = 0
+4:0/0 = 0
+5:0/0 = 0
+6:0/0 = 0
+7:0/0 = 0
+8:0/0 = 0
+9:0/0 = 0
+10:0/0 = 0
+11:0/0 = 0
+12:0/0 = 0
+13:0/0 = 0
+14:0/0 = 0
+15:0/0 = 0
+0:1/0 = 0
+1:1/0 = 0
+2:1/0 = 0
+3:1/0 = 0
+4:1/0 = 0
+5:1/0 = 0
+6:1/0 = 0
+7:1/0 = 0
+8:1/0 = 0
+9:1/0 = 0
+10:1/0 = 0
+11:1/0 = 0
+12:1/0 = 0
+13:1/0 = 0
+14:1/0 = 0
+15:1/0 = 0
+
+[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_xftlc"]
+texture = ExtResource("3_35kre")
+texture_region_size = Vector2i(128, 128)
+0:0/0 = 0
+
+[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_anah5"]
+texture = ExtResource("2_1n30v")
+texture_region_size = Vector2i(128, 128)
+0:1/0 = 0
+5:1/0 = 0
+9:1/0 = 0
+13:1/0 = 0
+3:3/0 = 0
+7:3/0 = 0
+10:3/0 = 0
+5:0/0 = 0
+11:0/0 = 0
+13:0/0 = 0
+14:0/0 = 0
+1:1/0 = 0
+2:1/0 = 0
+3:1/0 = 0
+6:1/0 = 0
+7:1/0 = 0
+10:1/0 = 0
+11:1/0 = 0
+14:1/0 = 0
+4:3/0 = 0
+11:3/0 = 0
+2:4/0 = 0
+3:4/0 = 0
+6:4/0 = 0
+7:4/0 = 0
+8:4/0 = 0
+11:4/0 = 0
+12:4/0 = 0
+
+[sub_resource type="TileSet" id="TileSet_7yhko"]
+tile_size = Vector2i(128, 128)
+sources/1 = SubResource("TileSetAtlasSource_03na7")
+sources/2 = SubResource("TileSetAtlasSource_xftlc")
+sources/3 = SubResource("TileSetAtlasSource_anah5")
+
+[node name="Node2D" type="Node2D"]
+script = ExtResource("1_03na7")
+
+[node name="Camera2D" type="Camera2D" parent="."]
+zoom = Vector2(0.3, 0.3)
+drag_horizontal_enabled = true
+drag_vertical_enabled = true
+
+[node name="Timer" type="Timer" parent="."]
+wait_time = 0.5
+autostart = true
+
+[node name="ghost_map" type="TileMapLayer" parent="."]
+tile_set = SubResource("TileSet_7yhko")
+rendering_quadrant_size = 32
+
+[node name="tilemap" type="TileMapLayer" parent="."]
+tile_set = SubResource("TileSet_7yhko")
+rendering_quadrant_size = 32
+
+[connection signal="timeout" from="Timer" to="." method="_on_timer_timeout"]
