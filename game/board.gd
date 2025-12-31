@@ -3,7 +3,7 @@ extends Node2D
 const ROWS := 20
 const COLS := 10
 const CELL_SIZE := 50
-const BIAS := Vector2i(200, 5)
+const BIAS := Vector2i(300, 5)
 
 const TYPE = [
 	[ Vector2i(0, -1), Vector2i(0, 0), Vector2i(0, 1), Vector2i(0, 2)   ], # I
@@ -41,6 +41,8 @@ const COLOR = [Color.CYAN, Color.BLUE, Color.ORANGE, Color.YELLOW, Color.GREEN, 
 const BUTTON_DELAY := 0.25
 const BUTTON_REPEAT := 0.04
 
+const show_next = 5
+
 var grid := []
 var cells := []
 var timer := 0.0
@@ -56,54 +58,74 @@ var spin_dir := 0
 var spin_time := 0.0
 var ghost_pos = Vector2i(0, 0)
 
+var seven_bag := []
+var rng
+var rng_seed = 114514
+var hold = null
+var is_holded = false
+
+func Cell(p, b=Vector2i(0, 0)) -> Rect2:
+	return Rect2(BIAS.x + b.x + p.y * CELL_SIZE, BIAS.y + b.y + p.x * CELL_SIZE, CELL_SIZE, CELL_SIZE)
+
 func _draw() -> void:
+	# BackGround & Placed Tetromino
 	for y in range(ROWS):
 		for x in range(COLS):
 			var color = Color(0.07, 0.07, 0.07) if (x + y) % 2 == 0 else Color(0.09, 0.09, 0.09)
 			if grid[y][x] != null:
 				color = grid[y][x]
-			draw_rect(
-				Rect2(
-					BIAS.x + x * CELL_SIZE,
-					BIAS.y + y * CELL_SIZE,
-					CELL_SIZE,
-					CELL_SIZE
-				),
-				color
-			)
-
+			draw_rect(Cell(Vector2i(y, x)), color)
+	# Borderline
 	draw_rect(
 		Rect2(BIAS.x + 0, BIAS.y + 0, COLS * CELL_SIZE, ROWS * CELL_SIZE),
 		Color.WHITE,
 		false,
 		2
 	)
-	
+	# Cell & Ghost
 	for c in cells:
 		var cp = pos + c
 		if cp.x >= 0:
-			draw_rect(
-				Rect2(
-					BIAS.x + cp.y * CELL_SIZE,
-					BIAS.y + cp.x * CELL_SIZE,
-					CELL_SIZE,
-					CELL_SIZE
-				),
-				COLOR[type]
-			)
+			draw_rect(Cell(cp), COLOR[type])
 		var gcp = ghost_pos + c
 		if gcp.x >= 0:
 			var color = COLOR[type]
 			color.a = 0.4
-			draw_rect(
-				Rect2(
-					BIAS.x + gcp.y * CELL_SIZE,
-					BIAS.y + gcp.x * CELL_SIZE,
-					CELL_SIZE,
-					CELL_SIZE
-				),
-				color
-			)
+			draw_rect(Cell(gcp), color)
+	var area
+	var area_rect
+	# Hold
+	area = Vector2i(CELL_SIZE * 5, CELL_SIZE * 3)
+	area_rect = Rect2(BIAS.x - area.x, BIAS.y, area.x, area.y)
+	draw_rect(area_rect, Color.BLACK)
+	draw_rect(area_rect, Color.WHITE, false, 2)
+	if hold != null:
+		for c in TYPE[hold]:
+			var b = Vector2i(- (CELL_SIZE + area.x) / 2, area.y / 2)
+			if hold == 0:
+				b.x -= CELL_SIZE / 2.0
+				b.y -= CELL_SIZE / 2.0
+			elif hold == 3:
+				b.x -= CELL_SIZE / 2.0
+			var color = COLOR[hold]
+			if is_holded:
+				color.a = 0.7
+			draw_rect(Cell(c, b), color)
+	# Next
+	area.y = area.y * show_next
+	area_rect = Rect2(BIAS.x - area.x + CELL_SIZE * (COLS + 5), BIAS.y, area.x, area.y)
+	draw_rect(area_rect, Color.BLACK)
+	draw_rect(area_rect, Color.WHITE, false, 2)
+	for i in range(show_next):
+		for c in TYPE[seven_bag[i]]:
+			var b = Vector2i(- (CELL_SIZE + area.x) / 2, area.y / 2)
+			if seven_bag[i] == 0:
+				b.x -= CELL_SIZE / 2.0
+				b.y -= CELL_SIZE / 2.0
+			elif seven_bag[i] == 3:
+				b.x -= CELL_SIZE / 2.0
+			b += Vector2i(CELL_SIZE * (COLS + 5), CELL_SIZE * i * 3 - (area.y - CELL_SIZE * 3) / 2.0)
+			draw_rect(Cell(c, b), COLOR[seven_bag[i]])
 
 # Called when the node enters the scene tree for the first time.
 func _ready():
@@ -111,9 +133,10 @@ func _ready():
 		grid.append([])
 		for x in range(COLS):
 			grid[y].append(null)
-	pos = Vector2i(5, 5)
-	type = randi_range(0, 6)
-	cells = TYPE[type]
+	rng = RandomNumberGenerator.new()
+	rng.seed = rng_seed
+	Spawn()
+	hold = null
 
 
 # Called every frame. 'delta' is the elapsed time since the previous frame.
@@ -183,7 +206,42 @@ func _input(e):
 	elif e.is_action_released("z"):
 		if spin_dir == -1:
 			spin_dir = 0
+	elif e.is_action_pressed("c"):
+		if not is_holded:
+			if hold == null:
+				hold = type
+				Spawn()
+			else:
+				var temp = type
+				type = hold
+				hold = temp
+				pos = Vector2i(0, 5)
+				dir = 0
+				cells = TYPE[type]
+			is_holded = true
 		
+func Random_Shuffle(arr, _seed) -> Array:
+	var RNG = RandomNumberGenerator.new()
+	RNG.seed = _seed
+	var shuffled_arr = arr.duplicate()
+	var n = arr.size() - 1
+	while n > 0:
+		var p = RNG.randi_range(0, n)
+		var temp = shuffled_arr[n]
+		shuffled_arr[n] = shuffled_arr[p]
+		shuffled_arr[p] = temp
+		n -= 1
+	return shuffled_arr
+	
+func Spawn()-> void:
+	while seven_bag.size() < 8:
+		seven_bag += Random_Shuffle([0, 1, 2, 3, 4, 5, 6], rng.randi())
+	type = seven_bag.pop_front()
+	pos = Vector2i(0, 5)
+	dir = 0
+	cells = TYPE[type]
+	is_holded = false
+
 func Collide(new_p, new_cells) -> bool:
 	for c in new_cells:
 		var cp = new_p + c
@@ -198,11 +256,7 @@ func Fall() -> void:
 			var cp = pos + c
 			grid[cp.x][cp.y] = COLOR[type]
 		Eliminate_Line()
-		pos = Vector2i(0, 5)
-		#type = randi_range(0, 6)
-		type = (type + 1) % 7
-		dir = 0
-		cells = TYPE[type]
+		Spawn()
 	else:
 		pos = new_pos
 		
