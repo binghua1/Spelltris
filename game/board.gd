@@ -156,8 +156,6 @@ func _ready():
 func _process(delta):
 	if gaming:
 		drop_timer += delta
-		DROP_TIME = 0.7 - op_times * 0.05
-		print(DROP_TIME)
 		if drop_timer > DROP_TIME:
 			Fall()
 			drop_timer = 0
@@ -177,11 +175,10 @@ func _process(delta):
 				Rotate(spin_dir)
 				spin_time = BUTTON_REPEAT
 		if is_on_ground:
-			lock_timer -= delta
-			if lock_timer <= 0:
+			lock_timer += delta
+			if lock_timer > LOCK_DELAY - 0.03 * op_times:
 				Lock()
 		Ghost()
-	
 	queue_redraw()
 
 func _input(e):
@@ -192,7 +189,7 @@ func _input(e):
 			horiz_dir = -1
 			horiz_time = BUTTON_DELAY
 			if is_on_ground and op_times < OPERATION_LIMIT:
-				lock_timer = LOCK_DELAY
+				lock_timer = 0.0
 				op_times += 1
 			Move(-1)
 		elif e.is_action_released("ui_left"):
@@ -202,7 +199,7 @@ func _input(e):
 			horiz_dir = 1
 			horiz_time = BUTTON_DELAY
 			if is_on_ground and op_times < OPERATION_LIMIT:
-				lock_timer = LOCK_DELAY
+				lock_timer = 0.0
 				op_times += 1
 			Move(1)
 		elif e.is_action_released("ui_right"):
@@ -219,7 +216,7 @@ func _input(e):
 			spin_dir = 1
 			spin_time = BUTTON_DELAY
 			if is_on_ground and op_times < OPERATION_LIMIT:
-				lock_timer = LOCK_DELAY
+				lock_timer = 0.0
 				op_times += 1
 			Rotate(1)
 		elif e.is_action_released("x") or e.is_action_released("ui_up"):
@@ -229,7 +226,7 @@ func _input(e):
 			spin_dir = -1
 			spin_time = BUTTON_DELAY
 			if is_on_ground and op_times < OPERATION_LIMIT:
-				lock_timer = LOCK_DELAY
+				lock_timer = 0.0
 				op_times += 1
 			Rotate(-1)
 		elif e.is_action_released("z"):
@@ -304,7 +301,7 @@ func Fall() -> void:
 		pos.x += 1
 		is_on_ground = OnGround()
 		if is_on_ground:
-			lock_timer = LOCK_DELAY
+			lock_timer = 0.0
 		
 func Move(d) -> void:
 	var new_pos = pos
@@ -341,7 +338,7 @@ func Drop() -> void:
 		pos = next_pos
 	if OnGround() and not is_on_ground:
 		is_on_ground = true
-		lock_timer = LOCK_DELAY
+		lock_timer = 0.0
 		
 	
 func Hard_Drop() -> void:
