@@ -11,10 +11,14 @@ config_version=5
 [application]
 
 config/name="game"
-run/main_scene="uid://b20r7ucu5bo00"
+run/main_scene="uid://yii5bh1uhf4q"
 config/features=PackedStringArray("4.5", "Forward Plus")
 boot_splash/show_image=false
 config/icon="res://icon.svg"
+
+[autoload]
+
+Network="*res://Network.gd"
 
 [input]
 

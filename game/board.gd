@@ -46,6 +46,12 @@ const OPERATION_LIMIT := 15
 
 const show_next := 5
 
+const OPPONENT_BIAS = Vector2i(1350, 5) # 對手盤面畫在右邊 (根據螢幕寬度調整)
+var opponent_grid = [] # 儲存對手的顏色數據
+var opponent_hold = null
+var opponent_next = []
+
+
 var grid := []
 var cells := []
 var drop_timer := 0.0
@@ -134,6 +140,58 @@ func _draw() -> void:
 				b.x -= CELL_SIZE / 2.0
 			b += Vector2i(CELL_SIZE * (COLS + 5), CELL_SIZE * i * 3 - (area.y - CELL_SIZE * 3) / 2.0)
 			draw_rect(Cell(c, b), COLOR[seven_bag[i]])
+	### Enemy ############
+	for y in range(ROWS):
+		for x in range(COLS):
+			var color = opponent_grid[y][x]
+			if color == null:
+				color = Color(0.05, 0.05, 0.05) # 對手底色更深一點
+			# 這裡使用自定義位移 OPPONENT_BIAS
+			var rect = Rect2(OPPONENT_BIAS.x + x * CELL_SIZE, OPPONENT_BIAS.y + y * CELL_SIZE, CELL_SIZE, CELL_SIZE)
+			draw_rect(rect, color)
+	# Enemy Borderline
+	draw_rect(
+		Rect2(OPPONENT_BIAS.x + 0, OPPONENT_BIAS.y + 0, COLS * CELL_SIZE, ROWS * CELL_SIZE),
+		Color.WHITE,
+		false,
+		2
+	)
+	
+	# Enemy Hold
+	area = Vector2i(CELL_SIZE * 5, CELL_SIZE * 3)
+	area_rect = Rect2(OPPONENT_BIAS.x - area.x, OPPONENT_BIAS.y, area.x, area.y)
+	draw_rect(area_rect, Color.BLACK)
+	draw_rect(area_rect, Color.WHITE, false, 2)
+	if opponent_hold != null:
+		for c in TYPE[opponent_hold]:
+			var b = Vector2i(- (CELL_SIZE + area.x) / 2, area.y / 2)
+			if opponent_hold == 0:
+				b.x -= CELL_SIZE / 2.0
+				b.y -= CELL_SIZE / 2.0
+			elif opponent_hold == 3:
+				b.x -= CELL_SIZE / 2.0
+			var color = COLOR[opponent_hold]
+			var r = Cell(c, b)
+			r.position += Vector2(OPPONENT_BIAS - BIAS)
+			draw_rect(r, color)
+
+	# Enemy Next
+	area.y = area.y * show_next
+	area_rect = Rect2(OPPONENT_BIAS.x - area.x + CELL_SIZE * (COLS + 5), OPPONENT_BIAS.y, area.x, area.y)
+	draw_rect(area_rect, Color.BLACK)
+	draw_rect(area_rect, Color.WHITE, false, 2)
+	for i in range(min(show_next, opponent_next.size())):
+		for c in TYPE[opponent_next[i]]:
+			var b = Vector2i(- (CELL_SIZE + area.x) / 2, area.y / 2)
+			if opponent_next[i] == 0:
+				b.x -= CELL_SIZE / 2.0
+				b.y -= CELL_SIZE / 2.0
+			elif opponent_next[i] == 3:
+				b.x -= CELL_SIZE / 2.0
+			b += Vector2i(CELL_SIZE * (COLS + 5), CELL_SIZE * i * 3 - (area.y - CELL_SIZE * 3) / 2.0)
+			var r = Cell(c, b)
+			r.position += Vector2(OPPONENT_BIAS - BIAS)
+			draw_rect(r, COLOR[opponent_next[i]])
 			
 func Reset() -> void:
 	grid = []
@@ -152,6 +210,16 @@ func Reset() -> void:
 
 func _ready():
 	Reset()
+	for y in range(ROWS):
+		opponent_grid.append([])
+		for x in range(COLS):
+			opponent_grid[y].append(null)
+			
+	# 監聽網路信號
+	Network.opponent_grid_updated.connect(_on_opponent_grid_updated)
+	print("正在連線到伺服器...")
+	if Network.socket.get_ready_state() != WebSocketPeer.STATE_OPEN:
+		Network.socket.connect_to_url(Network.url)
 
 func _process(delta):
 	if gaming:
@@ -301,6 +369,19 @@ func Lock() -> void:
 		var cp = pos + c
 		grid[cp.x][cp.y] = COLOR[type]
 	Eliminate_Line()
+	
+	# --- 新增同步發送 ---
+	var sync_data = []
+	for y in range(ROWS):
+		var row_data = []
+		for x in range(COLS):
+			if grid[y][x] == null: row_data.append(null)
+			else: row_data.append(grid[y][x].to_html()) # 轉成 hex 字串
+		sync_data.append(row_data)
+	# 傳送 hold 和 next (取前 show_next 個)
+	Network.send_sync(sync_data, hold, seven_bag.slice(0, show_next))
+	# ------------------
+	
 	Spawn()
 	
 func Fall() -> void:
@@ -381,3 +462,11 @@ func Eliminate_Line():
 		grid[y] = grid[ny]
 		grid[ny] = temp
 	
+	
+func _on_opponent_grid_updated(new_grid_data, new_hold, new_next):
+	# 後端傳來的是字串或陣列，我們需要轉回顏色
+	# 這裡假設傳來的是顏色 hex string 陣列
+	opponent_grid = new_grid_data
+	opponent_hold = new_hold
+	opponent_next = new_next
+	queue_redraw()
