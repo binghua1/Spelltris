@@ -6,7 +6,7 @@ signal opponent_grid_updated(grid_data, hold, next_queue, type, cells, pos, ghos
 signal connected_to_server
 
 var socket = WebSocketPeer.new()
-var url = "ws://127.0.0.1:8765"
+var url = "wss://spelltris.onrender.com/ws"
 var last_state = WebSocketPeer.STATE_CLOSED
 
 func _ready():
