@@ -1,6 +1,7 @@
 import asyncio
 import json
 import websockets
+import os
 
 # 儲存連線的玩家 {websocket: player_name}
 clients = {}
