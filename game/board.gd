@@ -43,14 +43,16 @@ const BUTTON_REPEAT := 0.04
 const LOCK_DELAY := 0.5
 const OPERATION_LIMIT := 15
 
-
 const show_next := 5
 
 const OPPONENT_BIAS = Vector2i(1350, 5) # 對手盤面畫在右邊 (根據螢幕寬度調整)
 var opponent_grid = [] # 儲存對手的顏色數據
 var opponent_hold = null
 var opponent_next = []
-
+var opponent_type = 0
+var opponent_cells = []
+var opponent_pos = Vector2i(0, 0)
+var opponent_ghost_pos = Vector2i(0, 0)
 
 var grid := []
 var cells := []
@@ -80,6 +82,9 @@ var gaming = true
 
 func Cell(p, b=Vector2i(0, 0)) -> Rect2:
 	return Rect2(BIAS.x + b.x + p.y * CELL_SIZE, BIAS.y + b.y + p.x * CELL_SIZE, CELL_SIZE, CELL_SIZE)
+
+func Opp_Cell(p, b=Vector2i(0, 0)) -> Rect2:
+	return Rect2(OPPONENT_BIAS.x + b.x + p.y * CELL_SIZE, OPPONENT_BIAS.y + b.y + p.x * CELL_SIZE, CELL_SIZE, CELL_SIZE)
 
 func _draw() -> void:
 	# BackGround & Placed Tetromino
@@ -157,6 +162,17 @@ func _draw() -> void:
 		2
 	)
 	
+	# Emeny Cell & Ghost
+	for c in opponent_cells:
+		var cp = opponent_pos + c
+		if cp.x >= 0:
+			draw_rect(Opp_Cell(cp), COLOR[opponent_type])
+		var gcp = opponent_ghost_pos + c
+		if gcp.x >= 0:
+			var color = COLOR[opponent_type]
+			color.a = 0.4
+			draw_rect(Opp_Cell(gcp), color)
+	
 	# Enemy Hold
 	area = Vector2i(CELL_SIZE * 5, CELL_SIZE * 3)
 	area_rect = Rect2(OPPONENT_BIAS.x - area.x, OPPONENT_BIAS.y, area.x, area.y)
@@ -207,6 +223,20 @@ func Reset() -> void:
 	gaming = true
 	op_times = 0
 	is_on_ground = false
+	Send_Data()
+
+func Send_Data() -> void:
+	# --- 新增同步發送 ---
+	var sync_data = []
+	for y in range(ROWS):
+		var row_data = []
+		for x in range(COLS):
+			if grid[y][x] == null: row_data.append(null)
+			else: row_data.append(grid[y][x].to_html()) # 轉成 hex 字串
+		sync_data.append(row_data)
+	# 傳送 hold 和 next (取前 show_next 個)
+	Network.send_sync(sync_data, hold, seven_bag.slice(0, show_next), type, cells, pos, ghost_pos)
+	# ------------------
 
 func _ready():
 	Reset()
@@ -324,6 +354,7 @@ func _input(e):
 					if Collide(pos, cells):
 						gaming = false
 				is_holded = true
+				Send_Data()
 	if e.is_action_pressed("r"):
 		Reset()
 		
@@ -368,25 +399,14 @@ func Lock() -> void:
 	for c in cells:
 		var cp = pos + c
 		grid[cp.x][cp.y] = COLOR[type]
-	Eliminate_Line()
-	
-	# --- 新增同步發送 ---
-	var sync_data = []
-	for y in range(ROWS):
-		var row_data = []
-		for x in range(COLS):
-			if grid[y][x] == null: row_data.append(null)
-			else: row_data.append(grid[y][x].to_html()) # 轉成 hex 字串
-		sync_data.append(row_data)
-	# 傳送 hold 和 next (取前 show_next 個)
-	Network.send_sync(sync_data, hold, seven_bag.slice(0, show_next))
-	# ------------------
-	
+	Eliminate_Line()	
 	Spawn()
+	Send_Data()
 	
 func Fall() -> void:
 	if not OnGround():
 		pos.x += 1
+		Send_Data()
 		
 func Move(d) -> void:
 	var new_pos = pos
@@ -414,6 +434,7 @@ func Rotate(d) -> void:
 			pos = pos + bias
 			cells = next_cells
 			dir = next_dir
+			Send_Data()
 			break;
 			
 func Drop() -> void:
@@ -421,6 +442,7 @@ func Drop() -> void:
 	next_pos.x += 1
 	if not Collide(next_pos, cells):
 		pos = next_pos
+		Send_Data()
 		
 	
 func Hard_Drop() -> void:
@@ -428,12 +450,16 @@ func Hard_Drop() -> void:
 		pos.x += 1
 	pos.x -= 1
 	Lock()
+	Send_Data()
 	
 func Ghost() -> void:
+	var old_ghost_pos = ghost_pos
 	ghost_pos = pos
 	while not Collide(ghost_pos, cells):
 		ghost_pos.x += 1
 	ghost_pos.x -= 1
+	if old_ghost_pos != ghost_pos:
+		Send_Data()
 	
 func Eliminate_Line():
 	for y in range(ROWS):
@@ -463,10 +489,13 @@ func Eliminate_Line():
 		grid[ny] = temp
 	
 	
-func _on_opponent_grid_updated(new_grid_data, new_hold, new_next):
+func _on_opponent_grid_updated(new_grid_data, new_hold, new_next, new_type, new_cells, new_pos, new_ghost_pos):
 	# 後端傳來的是字串或陣列，我們需要轉回顏色
 	# 這裡假設傳來的是顏色 hex string 陣列
 	opponent_grid = new_grid_data
 	opponent_hold = new_hold
 	opponent_next = new_next
-	queue_redraw()
+	opponent_type = new_type
+	opponent_cells = new_cells
+	opponent_pos = new_pos
+	opponent_ghost_pos = new_ghost_pos

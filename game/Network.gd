@@ -2,7 +2,7 @@ extends Node
 
 # 定義訊號
 signal match_found(opponent_info)
-signal opponent_grid_updated(grid_data, hold, next_queue) # 當收到對手盤面時發出
+signal opponent_grid_updated(grid_data, hold, next_queue, type, cells, pos, ghost_pos) # 當收到對手盤面時發出
 signal connected_to_server
 
 var socket = WebSocketPeer.new()
@@ -36,16 +36,38 @@ func send_packet(type: String, content: Dictionary):
 		socket.send_text(JSON.stringify(content))
 
 # 發送加入請求
-func send_join(name):
-	send_packet("join", { "name": name })
+func send_join(Name):
+	send_packet("join", { "name": Name })
+	
+func vec2json(v) -> Array:
+	return [v.x, v.y]
+	
+func json2vec(arr) -> Vector2i:
+	return Vector2i(arr[0], arr[1])
+
+func vecarray2json(arr) -> Array:
+	var out := []
+	for v in arr:
+		out.append([v.x, v.y])
+	return out
+	
+func json2vecarray(arr) -> Array:
+	var out := []
+	for v in arr:
+		out.append(Vector2i(v[0], v[1]))
+	return out
 
 # --- 【新增】發送盤面同步 ---
-func send_sync(grid_data, hold, next_queue):
+func send_sync(grid_data, hold, next_queue, type, cells, pos, ghost_pos):
 	# grid_data 已經在 board.gd 轉成 hex string 了，直接傳
 	send_packet("sync_grid", { 
 		"grid": grid_data,
 		"hold": hold,
-		"next": next_queue
+		"next": next_queue,
+		"tetro_type": type,
+		"cells": vecarray2json(cells),
+		"pos": vec2json(pos),
+		"ghost_pos": vec2json(ghost_pos)
 	})
 
 # 處理收到的訊息
@@ -72,6 +94,10 @@ func handle_message(data):
 			
 			var hold = data.get("hold")
 			var next_queue = data.get("next")
+			var type = data.get("tetro_type")
+			var cells = json2vecarray(data.get("cells"))
+			var pos = json2vec(data.get("pos"))
+			var ghost_pos = json2vec(data.get("ghost_pos"))
 			
 			# 發出訊號給 board.gd
-			opponent_grid_updated.emit(converted_grid, hold, next_queue)
+			opponent_grid_updated.emit(converted_grid, hold, next_queue, type, cells, pos, ghost_pos)
