@@ -15,6 +15,8 @@ var url = "wss://spelltris.onrender.com/ws"
 var last_state = WebSocketPeer.STATE_CLOSED
 
 func _ready():
+	if OS.has_feature("debug"):
+		url = "ws://127.0.0.1:8765"
 	connect_to_server()
 
 func connect_to_server():

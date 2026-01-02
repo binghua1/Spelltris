@@ -108,7 +108,7 @@ async def handler(websocket):
             del clients[websocket]
 
 async def main():
-    port = int(os.environ.get("PORT", 10000))
+    port = int(os.environ.get("PORT", 8765))
     print(f"伺服器啟動中，監聽 port {port}...")
     async with websockets.serve(handler, "0.0.0.0", port):
         await asyncio.Future()  # 讓程式持續執行
