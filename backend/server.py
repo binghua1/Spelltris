@@ -8,7 +8,7 @@ from aiohttp import web
 clients = {}
 # 儲存配對狀態 {websocket: opponent_websocket}
 matches = {}
-# 房間管理 {room_id: host_websocket}
+# 房間管理 {room_id: room_info dict (包含公開欄位，以及內部欄位 '_host' 指向 websocket)}
 rooms = {}
 
 async def health(request):
@@ -40,16 +40,35 @@ async def websocket_handler(request):
 
                 elif data["type"] == "create":
                     # 建立房間，回傳 room_id
-                    # 需要玩家已登入 (可選)
-                    room_id = data.get("room_id")
-                    room = data.get("room")
-                    if not room_id:
-                        room_id = uuid.uuid4().hex[:8]
-                    rooms[room_id] = ws
+                    # rooms 將儲存 room_info dict，內含內部鍵 '_host' 指向 websocket（不會回傳給 client）
+                    # 客戶端傳入的 room 會包含 'name' 和 'host'，我們保留這些欄位，只額外加上 'room_id' 與內部 '_host'
+                    room = data.get("room") or {}
+                    room_id = uuid.uuid4().hex[:8]
                     room["room_id"] = room_id
+                    room_info = dict(room)
+                    room_info["_host"] = ws
+                    rooms[room_id] = room_info
+                    # 對外回傳時移除內部欄位
                     print(f"玩家 {clients.get(ws)} 建立房間 {room_id}")
                     for player in clients:
                         await player.send_json({"type": "create_success", "room": room})
+                
+                # 刪除房間（由 host 執行），用法類似 create，會給 room_id
+                elif data["type"] == "delete":
+                    room_id = data.get("room_id")
+                    if not room_id:
+                        await ws.send_json({"type": "error", "message": "missing room_id"})
+                    elif room_id not in rooms:
+                        await ws.send_json({"type": "error", "message": "room not found"})
+                    else:
+                        room_info = rooms.get(room_id)
+                        # 僅允許房主刪除
+                        if room_info.get("_host") != ws:
+                            await ws.send_json({"type": "error", "message": "not host"})
+                        else:
+                            print(f"玩家 {clients.get(ws)} 刪除房間 {room_id}")
+                            for player in clients:
+                                await player.send_json({"type": "delete_success", "room_id": room_id})
 
                 elif data["type"] == "join":
                     # 使用 room_id 去加入房間並完成配對
@@ -59,7 +78,8 @@ async def websocket_handler(request):
                     elif room_id not in rooms:
                         await ws.send_json({"type": "error", "message": "room not found"})
                     else:
-                        host_ws = rooms.pop(room_id)
+                        host_info = rooms.pop(room_id)
+                        host_ws = host_info.get("_host")
                         # 登記配對
                         matches[host_ws] = ws
                         matches[ws] = host_ws
@@ -78,6 +98,14 @@ async def websocket_handler(request):
                             "role": "client",
                             "room_id": room_id
                         })
+
+                # 要求獲取房間清單：直接回傳所有 rooms 的陣列（不需要查 clients）
+                elif data["type"] == "room_list_request":
+                    public_rooms = [{k: v for k, v in info.items() if k != "_host"} for info in rooms.values()]
+                    await ws.send_json({
+                        "type": "room_list_respond",
+                        "rooms": public_rooms
+                    })
                 
                 # 轉發遊戲同步訊息
                 elif data["type"] == "sync_grid":
@@ -100,7 +128,7 @@ async def websocket_handler(request):
         print("連線中斷:", e)
     finally:
         # 如果這連線是某個房間的 host，移除房間
-        to_remove = [r for r, w in rooms.items() if w == ws]
+        to_remove = [r for r, info in rooms.items() if info.get("_host") == ws]
         for r in to_remove:
             del rooms[r]
 

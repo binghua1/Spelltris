@@ -7,18 +7,34 @@ func _ready():
 	$MainLayout/HBoxContainer/search_btn.connect("pressed", Callable(self, "_on_search_pressed"))
 	$MainLayout/HBoxContainer2/create_room_btn.connect("pressed", Callable(self, "_on_create_room_pressed"))
 	$MainLayout/HBoxContainer2/join_room_btn.connect("pressed", Callable(self, "_on_join_room_pressed"))
+	$MainLayout/HBoxContainer2/create_room_btn.disabled = false
+	$MainLayout/HBoxContainer2/join_room_btn.disabled = false
 	
 	$create_room_dialog/VBoxContainer/confirm_create_btn.connect("pressed", Callable(self, "_on_confirm_create_pressed"))
 	$create_room_dialog.hide()
+	
+	$waiting_for_match/VBoxContainer/cancel.connect("pressed", Callable(self, "_on_cancel_room_pressed"))
+	$waiting_for_match.hide()
+	
 	var line_height = $MainLayout/ScrollContainer/room_list.get_fixed_icon_size().y
 	$MainLayout/ScrollContainer.custom_minimum_size.y = line_height * 10
 	
 	Network.create_success.connect(_on_create_success)
+	Network.delete_success.connect(_on_delete_success)
 	Network.match_found.connect(_on_match_found)
-	_refresh_room_list()
+	Network.get_room_list.connect(_on_get_room_list)
+	
+	Network.send_room_list_request()
 
 func _on_create_success(new_room):
 	rooms.append(new_room)
+	Global.room_id = new_room.get("room_id")
+	_refresh_room_list()
+	
+func _on_delete_success(new_room_id):
+	rooms = rooms.filter(func(room):
+		return room.get("room_id", "") != new_room_id
+	)
 	_refresh_room_list()
 	
 func _on_match_found(room_id):
@@ -26,8 +42,11 @@ func _on_match_found(room_id):
 	rooms = rooms.filter(func(room):
 		return room.get("room_id", "") != room_id
 	)
-	print(rooms)
 	get_tree().change_scene_to_file("res://game.tscn")
+	
+func _on_get_room_list(new_rooms):
+	rooms = new_rooms
+	_refresh_room_list()
 
 # === 搜尋房間 ===
 func _on_search_pressed():
@@ -45,10 +64,22 @@ func _refresh_room_list(filter_keyword=""):
 			
 func _on_create_room_dialog_close_requested():
 	$create_room_dialog.hide()
+	
+func _on_waiting_for_match_close_requested() -> void:
+	Network.send_delete(Global.room_id)
+	$MainLayout/HBoxContainer2/create_room_btn.disabled = false
+	$MainLayout/HBoxContainer2/join_room_btn.disabled = false
+	$waiting_for_match.hide()
 
 # === 創建房間按鈕 ===
 func _on_create_room_pressed():
 	$create_room_dialog.popup_centered() # 彈出創房視窗
+	
+func _on_cancel_room_pressed():
+	Network.send_delete(Global.room_id)
+	$MainLayout/HBoxContainer2/create_room_btn.disabled = false
+	$MainLayout/HBoxContainer2/join_room_btn.disabled = false
+	$waiting_for_match.hide()
 
 # === 確認創建房間 ===
 func _on_confirm_create_pressed():
@@ -58,6 +89,9 @@ func _on_confirm_create_pressed():
 		Network.send_create(room)
 		$create_room_dialog/VBoxContainer/room_name_input.text = ""
 		$create_room_dialog.hide()
+		$waiting_for_match.popup_centered()
+		$MainLayout/HBoxContainer2/create_room_btn.disabled = true
+		$MainLayout/HBoxContainer2/join_room_btn.disabled = true
 
 # === 加入房間按鈕 ===
 func _on_join_room_pressed():

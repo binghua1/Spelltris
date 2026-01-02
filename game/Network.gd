@@ -3,7 +3,9 @@ extends Node
 # 定義訊號
 signal login_success()
 signal match_found(room_id)
-signal create_success(rooms)
+signal create_success(room)
+signal delete_success(room)
+signal get_room_list(rooms)
 signal opponent_grid_updated(grid_data, hold, next_queue, type, cells, pos, ghost_pos) # 當收到對手盤面時發出
 signal win_respond()
 signal connected_to_server
@@ -45,8 +47,14 @@ func send_packet(type: String, content: Dictionary):
 func send_login(Name):
 	send_packet("login", { "name": Name })
 	
+func send_room_list_request():
+	send_packet("room_list_request", {})
+	
 func send_create(room):
 	send_packet("create", { "room": room })
+	
+func send_delete(room_id):
+	send_packet("delete", { "room_id": room_id })
 
 func send_join(room_id):
 	send_packet("join", { "room_id": room_id })
@@ -92,8 +100,14 @@ func handle_message(data):
 		"login_success":
 			login_success.emit()
 			
+		"room_list_respond":
+			get_room_list.emit(data.get("rooms"))
+			
 		"create_success":
 			create_success.emit(data.get("room"))
+			
+		"delete_success":
+			delete_success.emit(data.get("room_id"))
 			
 		"match_success":
 			match_found.emit(data.get("room_id"))
