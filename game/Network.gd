@@ -1,12 +1,17 @@
 extends Node
 
 # 定義訊號
-signal match_found(opponent_info)
+signal login_success()
+signal match_found(room_id)
+signal create_success(rooms)
 signal opponent_grid_updated(grid_data, hold, next_queue, type, cells, pos, ghost_pos) # 當收到對手盤面時發出
+signal win_respond()
 signal connected_to_server
 
 var socket = WebSocketPeer.new()
 var url = "wss://spelltris.onrender.com/ws"
+#var url = "ws://127.0.0.1:8765"
+#var url = "wss://centrolecithal-unglobular-makena.ngrok-free.dev"
 var last_state = WebSocketPeer.STATE_CLOSED
 
 func _ready():
@@ -34,10 +39,32 @@ func send_packet(type: String, content: Dictionary):
 	if socket.get_ready_state() == WebSocketPeer.STATE_OPEN:
 		content["type"] = type
 		socket.send_text(JSON.stringify(content))
+		
+func send_login(Name):
+	send_packet("login", { "name": Name })
+	
+func send_create(room):
+	send_packet("create", { "room": room })
 
-# 發送加入請求
-func send_join(Name):
-	send_packet("join", { "name": Name })
+func send_join(room_id):
+	send_packet("join", { "room_id": room_id })
+	
+func send_game_end():
+	send_packet("game_end", {})
+
+# --- 【新增】發送盤面同步 ---
+func send_sync(grid_data, hold, next_queue, type, cells, pos, ghost_pos):
+	# grid_data 已經在 board.gd 轉成 hex string 了，直接傳
+	send_packet("sync_grid", { 
+		"grid": grid_data,
+		"hold": hold,
+		"next": next_queue,
+		"tetro_type": type,
+		"cells": vecarray2json(cells),
+		"pos": vec2json(pos),
+		"ghost_pos": vec2json(ghost_pos)
+	})
+	
 	
 func vec2json(v) -> Array:
 	return [v.x, v.y]
@@ -57,24 +84,17 @@ func json2vecarray(arr) -> Array:
 		out.append(Vector2i(v[0], v[1]))
 	return out
 
-# --- 【新增】發送盤面同步 ---
-func send_sync(grid_data, hold, next_queue, type, cells, pos, ghost_pos):
-	# grid_data 已經在 board.gd 轉成 hex string 了，直接傳
-	send_packet("sync_grid", { 
-		"grid": grid_data,
-		"hold": hold,
-		"next": next_queue,
-		"tetro_type": type,
-		"cells": vecarray2json(cells),
-		"pos": vec2json(pos),
-		"ghost_pos": vec2json(ghost_pos)
-	})
-
 # 處理收到的訊息
 func handle_message(data):
 	match data.type:
+		"login_success":
+			login_success.emit()
+			
+		"create_success":
+			create_success.emit(data.get("room"))
+			
 		"match_success":
-			match_found.emit(data)
+			match_found.emit(data.get("room_id"))
 			
 		# --- 【新增】處理對手盤面 ---
 		"sync_grid":
@@ -101,3 +121,9 @@ func handle_message(data):
 			
 			# 發出訊號給 board.gd
 			opponent_grid_updated.emit(converted_grid, hold, next_queue, type, cells, pos, ghost_pos)
+			
+		"win_game":
+			win_respond.emit()
+	
+		"error":
+			print(data.message)

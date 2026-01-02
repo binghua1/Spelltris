@@ -247,6 +247,7 @@ func _ready():
 			
 	# 監聽網路信號
 	Network.opponent_grid_updated.connect(_on_opponent_grid_updated)
+	Network.win_respond.connect(_on_win_respond)
 	print("正在連線到伺服器...")
 	if Network.socket.get_ready_state() != WebSocketPeer.STATE_OPEN:
 		Network.socket.connect_to_url(Network.url)
@@ -284,6 +285,10 @@ func _process(delta):
 			if lock_timer > LOCK_DELAY - 0.03 * op_times:
 				Lock()
 		Ghost()
+	else:
+		Network.send_game_end()
+		print("Player %s lose" % [Global.player_name])
+		get_tree().change_scene_to_file("res://lobby.tscn")
 	queue_redraw()
 
 func _input(e):
@@ -499,3 +504,8 @@ func _on_opponent_grid_updated(new_grid_data, new_hold, new_next, new_type, new_
 	opponent_cells = new_cells
 	opponent_pos = new_pos
 	opponent_ghost_pos = new_ghost_pos
+	
+func _on_win_respond():
+	gaming = false
+	print("Player %s win" % [Global.player_name])
+	get_tree().change_scene_to_file("res://lobby.tscn")
