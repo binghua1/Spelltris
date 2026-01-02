@@ -1,0 +1,94 @@
+[gd_scene load_steps=2 format=3 uid="uid://tavodcfudfxs"]
+
+[ext_resource type="Script" uid="uid://cjdu1k17h6ite" path="res://lobby.gd" id="1_ll2xe"]
+
+[node name="Lobby" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_ll2xe")
+
+[node name="MainLayout" type="VBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -131.5
+offset_top = -186.0
+offset_right = 131.5
+offset_bottom = 186.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="HBoxContainer" type="HBoxContainer" parent="MainLayout"]
+layout_mode = 2
+size_flags_vertical = 0
+
+[node name="search_input" type="LineEdit" parent="MainLayout/HBoxContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="search_btn" type="Button" parent="MainLayout/HBoxContainer"]
+layout_mode = 2
+text = "search"
+
+[node name="ScrollContainer" type="ScrollContainer" parent="MainLayout"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="room_list" type="ItemList" parent="MainLayout/ScrollContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 2
+select_mode = 1
+auto_width = true
+auto_height = true
+
+[node name="HBoxContainer2" type="HBoxContainer" parent="MainLayout"]
+layout_mode = 2
+size_flags_horizontal = 4
+size_flags_vertical = 0
+
+[node name="create_room_btn" type="Button" parent="MainLayout/HBoxContainer2"]
+layout_mode = 2
+text = "create"
+
+[node name="join_room_btn" type="Button" parent="MainLayout/HBoxContainer2"]
+layout_mode = 2
+text = "join"
+
+[node name="create_room_dialog" type="Window" parent="."]
+oversampling_override = 1.0
+size = Vector2i(500, 300)
+
+[node name="VBoxContainer" type="VBoxContainer" parent="create_room_dialog"]
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -50.0
+offset_top = -46.5
+offset_right = 50.0
+offset_bottom = 46.5
+grow_horizontal = 2
+grow_vertical = 2
+size_flags_stretch_ratio = 0.0
+
+[node name="Label" type="Label" parent="create_room_dialog/VBoxContainer"]
+layout_mode = 2
+text = "Room Name:"
+
+[node name="room_name_input" type="LineEdit" parent="create_room_dialog/VBoxContainer"]
+layout_mode = 2
+
+[node name="confirm_create_btn" type="Button" parent="create_room_dialog/VBoxContainer"]
+layout_mode = 2
+text = "confirm"
+
+[connection signal="close_requested" from="create_room_dialog" to="." method="_on_create_room_dialog_close_requested"]

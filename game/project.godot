@@ -15,10 +15,16 @@ run/main_scene="uid://yii5bh1uhf4q"
 config/features=PackedStringArray("4.5", "Forward Plus")
 boot_splash/show_image=false
 config/icon="res://icon.svg"
+run/autoload_on_startup=false
 
 [autoload]
 
 Network="*res://Network.gd"
+Global="*res://Global.gd"
+
+[debug]
+
+settings/main_scene="uid://yii5bh1uhf4q"
 
 [input]
 

@@ -1,13 +1,14 @@
 import asyncio
 import json
+import uuid
 import websockets
 
 # 儲存連線的玩家 {websocket: player_name}
 clients = {}
 # 儲存配對狀態 {websocket: opponent_websocket}
 matches = {}
-# 等待配對中的玩家
-waiting_player = None
+# 房間管理 {room_id: host_websocket}
+rooms = {}
 
 async def handler(websocket):
     global waiting_player
@@ -17,42 +18,59 @@ async def handler(websocket):
         async for message in websocket:
             data = json.loads(message)
             
-            if data["type"] == "join":
-                player_name = data["name"]
-                clients[websocket] = player_name
-                print(f"玩家 {player_name} 請求加入")
-                
-                # 簡單的配對邏輯：如果有因為人在等，就配對
-                # 防呆：如果 waiting_player 已經不在 clients 裡 (例如斷線但沒清乾淨)，就重置
-                if waiting_player and waiting_player not in clients:
-                    waiting_player = None
+            # 新協議：
+            # - "login": 記錄玩家名稱
+            # - "create": 建立房間 (可傳 room_id，若無則產生一個)
+            # - "join": 使用 room_id 加入並配對
+            if data["type"] == "login":
+                player_name = data.get("name")
+                if player_name:
+                    clients[websocket] = player_name
+                    print(f"玩家 {player_name} 已登入")
+                    await websocket.send(json.dumps({"type": "login_success", "name": player_name}))
+                else:
+                    await websocket.send(json.dumps({"type": "error", "message": "missing name"}))
 
-                if waiting_player and waiting_player != websocket:
-                    print(f"配對成功！ {clients[waiting_player]} vs {player_name}")
-                    
-                    # 記錄配對
-                    matches[waiting_player] = websocket
-                    matches[websocket] = waiting_player
-                    
-                    # 通知第一位玩家 (waiting_player)
-                    await waiting_player.send(json.dumps({
+            elif data["type"] == "create":
+                # 建立房間，回傳 room_id
+                # 需要玩家已登入 (可選)
+                room_id = data.get("room_id")
+                room = data.get("room")
+                if not room_id:
+                    room_id = uuid.uuid4().hex[:8]
+                rooms[room_id] = websocket
+                room["room_id"] = room_id
+                print(f"玩家 {clients.get(websocket)} 建立房間 {room_id}")
+                for player in clients:
+                    await player.send(json.dumps({"type": "create_success", "room": room}))
+
+            elif data["type"] == "join":
+                # 使用 room_id 去加入房間並完成配對
+                room_id = data.get("room_id")
+                if not room_id:
+                    await websocket.send(json.dumps({"type": "error", "message": "missing room_id"}))
+                elif room_id not in rooms:
+                    await websocket.send(json.dumps({"type": "error", "message": "room not found"}))
+                else:
+                    host_ws = rooms.pop(room_id)
+                    # 登記配對
+                    matches[host_ws] = websocket
+                    matches[websocket] = host_ws
+
+                    # 通知雙方配對成功
+                    await host_ws.send(json.dumps({
                         "type": "match_success",
-                        "opponent_name": player_name,
-                        "role": "host" # 或是 p1
+                        "opponent_name": clients.get(websocket),
+                        "role": "host",
+                        "room_id": room_id
                     }))
-                    
-                    # 通知第二位玩家 (目前的 websocket)
+
                     await websocket.send(json.dumps({
                         "type": "match_success",
-                        "opponent_name": clients[waiting_player],
-                        "role": "client" # 或是 p2
+                        "opponent_name": clients.get(host_ws),
+                        "role": "client",
+                        "room_id": room_id
                     }))
-                    
-                    # 清空等待者
-                    waiting_player = None
-                else:
-                    print(f"玩家 {player_name} 進入等待列...")
-                    waiting_player = websocket
             
             # 轉發遊戲同步訊息
             elif data["type"] == "sync_grid":
@@ -60,22 +78,31 @@ async def handler(websocket):
                     opponent = matches[websocket]
                     # 直接轉發給對手
                     await opponent.send(message)
+
+            elif data["type"] == "game_end":
+                if websocket in matches:
+                    opponent = matches[websocket]
+                    
+                    await opponent.send(json.dumps({
+                        "type": "win_game"
+                    }))
+
                     
     except websockets.exceptions.ConnectionClosed:
         print("連線中斷")
     finally:
-        # 確保無論如何都清除等待狀態
-        if waiting_player == websocket:
-            waiting_player = None
-        
-        # 清除配對狀態
+        # 如果這連線是某個房間的 host，移除房間
+        to_remove = [r for r, ws in rooms.items() if ws == websocket]
+        for r in to_remove:
+            del rooms[r]
+
+        # 清除配對狀態並可選擇通知對手
         if websocket in matches:
             opponent = matches[websocket]
             if opponent in matches:
                 del matches[opponent]
-                # 可以選擇通知對手對方斷線了
             del matches[websocket]
-            
+
         if websocket in clients:
             del clients[websocket]
 
