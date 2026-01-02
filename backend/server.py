@@ -18,7 +18,6 @@ async def websocket_handler(request):
     ws = web.WebSocketResponse()
     await ws.prepare(request)
     
-    global waiting_player
     print("有新連線進入...")
     
     try:
