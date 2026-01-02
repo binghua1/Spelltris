@@ -9,7 +9,8 @@ signal win_respond()
 signal connected_to_server
 
 var socket = WebSocketPeer.new()
-var url = "ws://127.0.0.1:8765"
+var url = "wss://spelltris.onrender.com/ws"
+#var url = "ws://127.0.0.1:8765"
 #var url = "wss://centrolecithal-unglobular-makena.ngrok-free.dev"
 var last_state = WebSocketPeer.STATE_CLOSED
 

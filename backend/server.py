@@ -2,6 +2,7 @@ import asyncio
 import json
 import uuid
 import websockets
+import os
 
 # 儲存連線的玩家 {websocket: player_name}
 clients = {}
@@ -107,8 +108,9 @@ async def handler(websocket):
             del clients[websocket]
 
 async def main():
-    print("伺服器啟動中，監聽 port 8765...")
-    async with websockets.serve(handler, "0.0.0.0", 8765):
+    port = int(os.environ.get("PORT", 10000))
+    print(f"伺服器啟動中，監聽 port {port}...")
+    async with websockets.serve(handler, "0.0.0.0", port):
         await asyncio.Future()  # 讓程式持續執行
 
 if __name__ == "__main__":
