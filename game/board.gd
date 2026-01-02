@@ -3,7 +3,7 @@ extends Node2D
 const ROWS := 20
 const COLS := 10
 const CELL_SIZE := 50
-const BIAS := Vector2i(300, 5)
+const BIAS := Vector2i(500, 300)
 
 const TYPE = [
 	[ Vector2i(0, -1), Vector2i(0, 0), Vector2i(0, 1), Vector2i(0, 2)   ], # I
@@ -45,7 +45,7 @@ const OPERATION_LIMIT := 15
 
 const show_next := 5
 
-const OPPONENT_BIAS = Vector2i(1350, 5) # 對手盤面畫在右邊 (根據螢幕寬度調整)
+const OPPONENT_BIAS = Vector2i(1850, 300) # 對手盤面畫在右邊 (根據螢幕寬度調整)
 var opponent_grid = [] # 儲存對手的顏色數據
 var opponent_hold = null
 var opponent_next = []
@@ -271,11 +271,8 @@ func _process(delta):
 		if spin_dir != 0:
 			spin_time -= delta
 			if spin_time <= 0:
-				if not is_on_ground or op_times < OPERATION_LIMIT:
-					Rotate(spin_dir)
-					spin_time = BUTTON_REPEAT
-				if is_on_ground:
-					op_times += 1
+				Rotate(spin_dir)
+				spin_time = BUTTON_REPEAT
 				
 		if OnGround():
 			if not is_on_ground:
@@ -284,7 +281,6 @@ func _process(delta):
 		else:
 			is_on_ground = false
 		if is_on_ground:
-			print(lock_timer)
 			lock_timer += delta
 			if lock_timer > LOCK_DELAY - 0.03 * op_times:
 				Lock()
