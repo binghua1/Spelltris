@@ -85,6 +85,8 @@ var lines_cleared = 0 # 累計消除的行數
 var incoming_attack_lines = 0 # 即將到來的攻擊行數
 var last_move_was_tspin = false # 上一次動作是否為T-spin
 var last_rotated = false # 上次是否旋轉
+var b2b = false
+var combo = -1
 
 func Cell(p, b=Vector2i(0, 0)) -> Rect2:
 	return Rect2(BIAS.x + b.x + p.y * CELL_SIZE, BIAS.y + b.y + p.x * CELL_SIZE, CELL_SIZE, CELL_SIZE)
@@ -239,6 +241,8 @@ func Reset() -> void:
 	lines_cleared = 0
 	incoming_attack_lines = 0
 	last_move_was_tspin = false
+	b2b = false
+	combo = -1
 	last_rotated = false
 	Send_Data()
 
@@ -256,6 +260,9 @@ func Send_Data() -> void:
 	# ------------------
 
 func _ready():
+	print("visible:", get_viewport().get_visible_rect().size)
+	print("board pos:", global_position)
+	print("board scale:", global_scale)
 	Reset()
 	for y in range(ROWS):
 		opponent_grid.append([])
@@ -514,36 +521,45 @@ func Eliminate_Line():
 			for x in COLS:
 				grid[y][x] = null
 	
-	if lines_cleared_now > 0:
-		lines_cleared += lines_cleared_now
+	lines_cleared += lines_cleared_now
+	
+	# 計算攻擊行數
+	var attack = 0
+	if last_move_was_tspin:
+		if lines_cleared_now == 0:
+			attack = 2 if b2b else 1
+		elif lines_cleared_now == 1:
+			attack = 3 if b2b else 2
+		elif lines_cleared_now == 2:
+			attack = 6 if b2b else 4
+		elif lines_cleared_now == 3:
+			attack = 9 if b2b else 6
+		b2b = true
+	else:
+		if lines_cleared_now == 2:
+			attack = 1
+		elif lines_cleared_now == 3:
+			attack = 2
+		elif lines_cleared_now == 4:
+			attack = 6 if b2b else 4
+		b2b = (lines_cleared_now == 4)
 		
-		# 計算攻擊行數
-		var attack = 0
-		if last_move_was_tspin:
-			if lines_cleared_now == 1:
-				attack = 1
-			elif lines_cleared_now == 2:
-				attack = 4
-		else:
-			if lines_cleared_now == 2:
-				attack = 1
-			elif lines_cleared_now == 3:
-				attack = 2
-			elif lines_cleared_now == 4:
-				attack = 4
-				
-		if attack > 0:
-			print("Sending attack: ", attack)
-			Network.send_attack(attack)
+	# ren
+	combo = -1 if (lines_cleared_now == 0) else combo + 1
+	attack += min(4, int((combo + 1) / 2.0))
 			
-		# 抵銷攻擊
-		if incoming_attack_lines > 0:
-			if incoming_attack_lines >= attack:
-				incoming_attack_lines -= attack
-				attack = 0
-			else:
-				attack -= incoming_attack_lines
-				incoming_attack_lines = 0
+	if attack > 0:
+		print("Sending attack: ", attack)
+		Network.send_attack(attack)
+		
+	# 抵銷攻擊
+	if incoming_attack_lines > 0:
+		if incoming_attack_lines >= attack:
+			incoming_attack_lines -= attack
+			attack = 0
+		else:
+			attack -= incoming_attack_lines
+			incoming_attack_lines = 0
 	
 	# 處理接收到的攻擊 (如果沒有消除行，或者消除後還有剩餘攻擊)
 	if lines_cleared_now == 0 and incoming_attack_lines > 0:
