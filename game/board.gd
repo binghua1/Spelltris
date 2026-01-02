@@ -271,8 +271,11 @@ func _process(delta):
 		if spin_dir != 0:
 			spin_time -= delta
 			if spin_time <= 0:
-				Rotate(spin_dir)
-				spin_time = BUTTON_REPEAT
+				if not is_on_ground or op_times < OPERATION_LIMIT:
+					Rotate(spin_dir)
+					spin_time = BUTTON_REPEAT
+				if is_on_ground:
+					op_times += 1
 				
 		if OnGround():
 			if not is_on_ground:
@@ -281,6 +284,7 @@ func _process(delta):
 		else:
 			is_on_ground = false
 		if is_on_ground:
+			print(lock_timer)
 			lock_timer += delta
 			if lock_timer > LOCK_DELAY - 0.03 * op_times:
 				Lock()
