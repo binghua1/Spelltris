@@ -121,6 +121,12 @@ async def websocket_handler(request):
                         await opponent.send_json({
                             "type": "win_game"
                         })
+                elif data['type'] == 'attack':
+                    if ws in matches:
+                        opponent = matches[ws]
+                        # 直接轉發給對手
+                        await opponent.send_str(msg.data)
+                        
             elif msg.type == web.WSMsgType.ERROR:
                 print('ws connection closed with exception %s', ws.exception())
 

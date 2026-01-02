@@ -80,6 +80,12 @@ var is_on_ground = false
 
 var gaming = true
 
+# 攻擊相關變數
+var lines_cleared = 0 # 累計消除的行數
+var incoming_attack_lines = 0 # 即將到來的攻擊行數
+var last_move_was_tspin = false # 上一次動作是否為T-spin
+var last_rotated = false # 上次是否旋轉
+
 func Cell(p, b=Vector2i(0, 0)) -> Rect2:
 	return Rect2(BIAS.x + b.x + p.y * CELL_SIZE, BIAS.y + b.y + p.x * CELL_SIZE, CELL_SIZE, CELL_SIZE)
 
@@ -208,7 +214,14 @@ func _draw() -> void:
 			var r = Cell(c, b)
 			r.position += Vector2(OPPONENT_BIAS - BIAS)
 			draw_rect(r, COLOR[opponent_next[i]])
-			
+				# 顯示消除行數
+	var font = ThemeDB.fallback_font
+	var font_size = 32
+	draw_string(font, Vector2(BIAS.x, BIAS.y + ROWS * CELL_SIZE + 40), "Lines: %d" % lines_cleared, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size)
+	
+	# 顯示接收到的攻擊
+	if incoming_attack_lines > 0:
+		draw_string(font, Vector2(BIAS.x + 200, BIAS.y + ROWS * CELL_SIZE + 40), "Incoming: %d" % incoming_attack_lines, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, Color.RED)
 func Reset() -> void:
 	grid = []
 	for y in range(ROWS):
@@ -223,6 +236,10 @@ func Reset() -> void:
 	gaming = true
 	op_times = 0
 	is_on_ground = false
+	lines_cleared = 0
+	incoming_attack_lines = 0
+	last_move_was_tspin = false
+	last_rotated = false
 	Send_Data()
 
 func Send_Data() -> void:
@@ -248,6 +265,7 @@ func _ready():
 	# 監聽網路信號
 	Network.opponent_grid_updated.connect(_on_opponent_grid_updated)
 	Network.win_respond.connect(_on_win_respond)
+	Network.attack_received.connect(_on_attack_received)
 	print("正在連線到伺服器...")
 	if Network.socket.get_ready_state() != WebSocketPeer.STATE_OPEN:
 		Network.socket.connect_to_url(Network.url)
@@ -401,6 +419,19 @@ func OnGround() -> bool:
 	return Collide(new_pos, cells)
 	
 func Lock() -> void:
+	# 檢查 T-spin
+	last_move_was_tspin = false
+	if type == 5 and last_rotated: # 5 is T-piece
+		var corners = [Vector2i(-1, -1), Vector2i(-1, 1), Vector2i(1, -1), Vector2i(1, 1)]
+		var occupied_corners = 0
+		for corner in corners:
+			var check_pos = pos + corner
+			if check_pos.x >= ROWS or check_pos.y < 0 or check_pos.y >= COLS or (check_pos.x >= 0 and grid[check_pos.x][check_pos.y] != null):
+				occupied_corners += 1
+		if occupied_corners >= 3:
+			last_move_was_tspin = true
+			print("T-Spin Detected!")
+
 	for c in cells:
 		var cp = pos + c
 		grid[cp.x][cp.y] = COLOR[type]
@@ -411,6 +442,7 @@ func Lock() -> void:
 func Fall() -> void:
 	if not OnGround():
 		pos.x += 1
+		last_rotated = false # 下落後重置旋轉標記
 		Send_Data()
 		
 func Move(d) -> void:
@@ -418,6 +450,7 @@ func Move(d) -> void:
 	new_pos.y += d
 	if not Collide(new_pos, cells):
 		pos = new_pos
+		last_rotated = false # 移動後重置旋轉標記
 		
 func Rotate(d) -> void:
 	var next_dir = (dir + 4 + d) % 4
@@ -439,6 +472,7 @@ func Rotate(d) -> void:
 			pos = pos + bias
 			cells = next_cells
 			dir = next_dir
+			last_rotated = true # 記錄旋轉
 			Send_Data()
 			break;
 			
@@ -447,6 +481,7 @@ func Drop() -> void:
 	next_pos.x += 1
 	if not Collide(next_pos, cells):
 		pos = next_pos
+		last_rotated = false # 下落後重置旋轉標記
 		Send_Data()
 		
 	
@@ -454,6 +489,7 @@ func Hard_Drop() -> void:
 	while not Collide(pos, cells):
 		pos.x += 1
 	pos.x -= 1
+	last_rotated = false # 硬降視為移動
 	Lock()
 	Send_Data()
 	
@@ -467,14 +503,52 @@ func Ghost() -> void:
 		Send_Data()
 	
 func Eliminate_Line():
+	var lines_cleared_now = 0
 	for y in range(ROWS):
 		var is_full_line = true
 		for x in range(COLS):
 			if grid[y][x] == null:
 				is_full_line = false
 		if is_full_line:
+			lines_cleared_now += 1
 			for x in COLS:
 				grid[y][x] = null
+	
+	if lines_cleared_now > 0:
+		lines_cleared += lines_cleared_now
+		
+		# 計算攻擊行數
+		var attack = 0
+		if last_move_was_tspin:
+			if lines_cleared_now == 1:
+				attack = 1
+			elif lines_cleared_now == 2:
+				attack = 4
+		else:
+			if lines_cleared_now == 2:
+				attack = 1
+			elif lines_cleared_now == 3:
+				attack = 2
+			elif lines_cleared_now == 4:
+				attack = 4
+				
+		if attack > 0:
+			print("Sending attack: ", attack)
+			Network.send_attack(attack)
+			
+		# 抵銷攻擊
+		if incoming_attack_lines > 0:
+			if incoming_attack_lines >= attack:
+				incoming_attack_lines -= attack
+				attack = 0
+			else:
+				attack -= incoming_attack_lines
+				incoming_attack_lines = 0
+	
+	# 處理接收到的攻擊 (如果沒有消除行，或者消除後還有剩餘攻擊)
+	if lines_cleared_now == 0 and incoming_attack_lines > 0:
+		add_garbage_lines(incoming_attack_lines)
+		incoming_attack_lines = 0
 	
 	for y in range(ROWS - 1, -1, -1):
 		var ny = y + 1
@@ -509,3 +583,25 @@ func _on_win_respond():
 	gaming = false
 	print("Player %s win" % [Global.player_name])
 	get_tree().change_scene_to_file("res://lobby.tscn")
+
+func _on_attack_received(lines):
+	print("Received attack: ", lines)
+	incoming_attack_lines += lines
+
+func add_garbage_lines(count):
+	# 將現有方塊上移
+	for y in range(count, ROWS):
+		grid[y - count] = grid[y]
+	
+	# 底部新增垃圾行
+	var hole = rng.randi_range(0, COLS - 1)
+	for i in range(count):
+		var y = ROWS - 1 - i
+		grid[y] = []
+		for x in range(COLS):
+			if x == hole:
+				grid[y].append(null)
+			else:
+				grid[y].append(Color.GRAY) # 垃圾行顏色
+	
+	Send_Data()

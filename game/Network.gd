@@ -9,6 +9,7 @@ signal get_room_list(rooms)
 signal opponent_grid_updated(grid_data, hold, next_queue, type, cells, pos, ghost_pos) # 當收到對手盤面時發出
 signal win_respond()
 signal connected_to_server
+signal attack_received(lines) # 收到對手攻擊行時發出
 
 var socket = WebSocketPeer.new()
 var url = "wss://spelltris.onrender.com/ws"
@@ -61,6 +62,9 @@ func send_join(room_id):
 	
 func send_game_end():
 	send_packet("game_end", {})
+
+func send_attack(lines: int):
+	send_packet("attack", { "lines": lines })
 
 # --- 【新增】發送盤面同步 ---
 func send_sync(grid_data, hold, next_queue, type, cells, pos, ghost_pos):
@@ -140,6 +144,9 @@ func handle_message(data):
 			
 		"win_game":
 			win_respond.emit()
+	
+		"attack":
+			attack_received.emit(data.get("lines"))
 	
 		"error":
 			print(data.message)
