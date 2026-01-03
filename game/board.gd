@@ -59,6 +59,12 @@ var cells := []
 var drop_timer := 0.0
 var lock_timer := 0.0
 var DROP_TIME := 0.7
+# 用來讓掉落速度變快
+var total_gametime := 0.0 
+const MIN_DROP_TIME := 0.03
+const SPEED_DECAY := 0.017 
+const INITIAL_DROP_TIME := 0.7
+
 var pos := Vector2i(0, 0)
 var dir := 0
 var type := 0
@@ -244,6 +250,8 @@ func Reset() -> void:
 	b2b = false
 	combo = -1
 	last_rotated = false
+	total_gametime = 0
+	DROP_TIME = INITIAL_DROP_TIME
 	Send_Data()
 
 func Send_Data() -> void:
@@ -280,6 +288,7 @@ func _ready():
 func _process(delta):
 	if gaming:
 		drop_timer += delta
+		DROP_TIME = max(MIN_DROP_TIME, INITIAL_DROP_TIME - (lines_cleared * SPEED_DECAY))
 		if drop_timer > DROP_TIME:
 			Fall()
 			drop_timer = 0
