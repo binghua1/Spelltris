@@ -94,6 +94,10 @@ var last_rotated = false # 上次是否旋轉
 var b2b = false
 var combo = -1
 
+var my_score = 0
+var opponent_score = 0
+const WIN_SCORE = 3
+
 func Cell(p, b=Vector2i(0, 0)) -> Rect2:
 	return Rect2(BIAS.x + b.x + p.y * CELL_SIZE, BIAS.y + b.y + p.x * CELL_SIZE, CELL_SIZE, CELL_SIZE)
 
@@ -230,7 +234,12 @@ func _draw() -> void:
 	# 顯示接收到的攻擊
 	if incoming_attack_lines > 0:
 		draw_string(font, Vector2(BIAS.x + 200, BIAS.y + ROWS * CELL_SIZE + 40), "Incoming: %d" % incoming_attack_lines, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, Color.RED)
-func Reset() -> void:
+
+	# Score
+	draw_string(font, Vector2(BIAS.x, BIAS.y - 20), "Score: %d" % my_score, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size)
+	draw_string(font, Vector2(OPPONENT_BIAS.x, OPPONENT_BIAS.y - 20), "Score: %d" % opponent_score, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size)
+
+func Reset(reset_scores = true) -> void:
 	grid = []
 	for y in range(ROWS):
 		grid.append([])
@@ -252,7 +261,20 @@ func Reset() -> void:
 	last_rotated = false
 	total_gametime = 0
 	DROP_TIME = INITIAL_DROP_TIME
+	if reset_scores:
+		my_score = 0
+		opponent_score = 0
 	Send_Data()
+
+func HandleLoss() -> void:
+	Network.send_game_end()
+	opponent_score += 1
+	if opponent_score >= WIN_SCORE:
+		gaming = false
+		print("Player %s lose match" % [Global.player_name])
+		get_tree().change_scene_to_file("res://lobby.tscn")
+	else:
+		Reset(false)
 
 func Send_Data() -> void:
 	# --- 新增同步發送 ---
@@ -319,10 +341,6 @@ func _process(delta):
 			if lock_timer > LOCK_DELAY - 0.03 * op_times:
 				Lock()
 		Ghost()
-	else:
-		Network.send_game_end()
-		print("Player %s lose" % [Global.player_name])
-		get_tree().change_scene_to_file("res://lobby.tscn")
 	queue_redraw()
 
 func _input(e):
@@ -391,7 +409,7 @@ func _input(e):
 					op_times = 0
 					is_on_ground = OnGround()
 					if Collide(pos, cells):
-						gaming = false
+						HandleLoss()
 				is_holded = true
 				Send_Data()
 	if e.is_action_pressed("r"):
@@ -421,7 +439,7 @@ func Spawn()-> void:
 	op_times = 0
 	is_on_ground = OnGround()
 	if Collide(pos, cells):
-		gaming = false
+		HandleLoss()
 
 func Collide(new_p, new_cells) -> bool:
 	for c in new_cells:
@@ -605,9 +623,13 @@ func _on_opponent_grid_updated(new_grid_data, new_hold, new_next, new_type, new_
 	opponent_ghost_pos = new_ghost_pos
 	
 func _on_win_respond():
-	gaming = false
-	print("Player %s win" % [Global.player_name])
-	get_tree().change_scene_to_file("res://lobby.tscn")
+	my_score += 1
+	if my_score >= WIN_SCORE:
+		gaming = false
+		print("Player %s win match" % [Global.player_name])
+		get_tree().change_scene_to_file("res://lobby.tscn")
+	else:
+		Reset(false)
 
 func _on_attack_received(lines):
 	print("Received attack: ", lines)
