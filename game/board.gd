@@ -230,15 +230,33 @@ func _draw() -> void:
 	var font = ThemeDB.fallback_font
 	var font_size = 32
 	draw_string(font, Vector2(BIAS.x, BIAS.y + ROWS * CELL_SIZE + 40), "Lines: %d" % lines_cleared, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size)
-	
-	# 顯示接收到的攻擊
-	if incoming_attack_lines > 0:
-		draw_string(font, Vector2(BIAS.x + 200, BIAS.y + ROWS * CELL_SIZE + 40), "Incoming: %d" % incoming_attack_lines, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, Color.RED)
 
+	var bar_width = 20
+	#var bar_gap = 10
+	var max_visible_lines = 17
+	
+	var bar_x = BIAS.x - bar_width
+	var bar_bottom_y = BIAS.y + ROWS * CELL_SIZE 
+	var full_bar_height = max_visible_lines * CELL_SIZE 
+	var full_bar_y = bar_bottom_y - full_bar_height 
+	draw_rect(Rect2(bar_x, full_bar_y, bar_width, full_bar_height), Color.WHITE, false, 2)
+	if incoming_attack_lines > 0:
+		# cal height
+		var visible_lines = min(incoming_attack_lines, max_visible_lines)
+		var fill_height = visible_lines * CELL_SIZE
+		var fill_y = bar_bottom_y - fill_height 
+		var bar_color = Color.GREEN
+		if incoming_attack_lines >= 12:
+			bar_color = Color.RED
+		elif incoming_attack_lines >= 6:
+			bar_color = Color.ORANGE
+		elif incoming_attack_lines >= 3:
+			bar_color = Color.YELLOW
+		draw_rect(Rect2(bar_x, fill_y, bar_width, fill_height), bar_color)
 	# Score
 	draw_string(font, Vector2(BIAS.x, BIAS.y - 20), "Score: %d" % my_score, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size)
 	draw_string(font, Vector2(OPPONENT_BIAS.x, OPPONENT_BIAS.y - 20), "Score: %d" % opponent_score, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size)
-
+	
 func Reset(reset_scores = true) -> void:
 	grid = []
 	for y in range(ROWS):
