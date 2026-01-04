@@ -98,6 +98,8 @@ var my_score = 0
 var opponent_score = 0
 const WIN_SCORE = 3
 
+signal game_over(game_status)
+
 func Cell(p, b=Vector2i(0, 0)) -> Rect2:
 	return Rect2(BIAS.x + b.x + p.y * CELL_SIZE, BIAS.y + b.y + p.x * CELL_SIZE, CELL_SIZE, CELL_SIZE)
 
@@ -289,8 +291,7 @@ func HandleLoss() -> void:
 	opponent_score += 1
 	if opponent_score >= WIN_SCORE:
 		gaming = false
-		print("Player %s lose match" % [Global.player_name])
-		get_tree().change_scene_to_file("res://lobby.tscn")
+		game_over.emit("lose")
 	else:
 		Reset(false)
 
@@ -430,8 +431,8 @@ func _input(e):
 						HandleLoss()
 				is_holded = true
 				Send_Data()
-	if e.is_action_pressed("r"):
-		Reset()
+	#if e.is_action_pressed("r"):
+		#Reset()
 		
 func Random_Shuffle(arr, _seed) -> Array:
 	var RNG = RandomNumberGenerator.new()
@@ -644,8 +645,7 @@ func _on_win_respond():
 	my_score += 1
 	if my_score >= WIN_SCORE:
 		gaming = false
-		print("Player %s win match" % [Global.player_name])
-		get_tree().change_scene_to_file("res://lobby.tscn")
+		game_over.emit("win")
 	else:
 		Reset(false)
 

@@ -10,6 +10,9 @@ signal opponent_grid_updated(grid_data, hold, next_queue, type, cells, pos, ghos
 signal win_respond()
 signal connected_to_server
 signal attack_received(lines) # 收到對手攻擊行時發出
+signal rematch_offer()
+signal rematch_start()
+signal opponent_left()
 
 var socket = WebSocketPeer.new()
 var url = "wss://spelltris.onrender.com/ws"
@@ -65,6 +68,12 @@ func send_game_end():
 
 func send_attack(lines: int):
 	send_packet("attack", { "lines": lines })
+
+func send_rematch():
+	send_packet("rematch", {})
+	
+func send_leave():
+	send_packet("leave", {})
 
 # --- 【新增】發送盤面同步 ---
 func send_sync(grid_data, hold, next_queue, type, cells, pos, ghost_pos):
@@ -147,6 +156,15 @@ func handle_message(data):
 	
 		"attack":
 			attack_received.emit(data.get("lines"))
+			
+		"rematch_offer":
+			rematch_offer.emit()
+			
+		"rematch_start":
+			rematch_start.emit()
+			
+		"opponent_left":
+			opponent_left.emit()
 	
 		"error":
 			print(data.message)

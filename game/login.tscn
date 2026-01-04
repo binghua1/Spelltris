@@ -381,6 +381,7 @@ offset_top = -229.0
 offset_right = 219.02399
 offset_bottom = -129.0
 grow_horizontal = 2
+grow_vertical = 2
 text = "Spelltris"
 label_settings = SubResource("LabelSettings_3n56f")
 

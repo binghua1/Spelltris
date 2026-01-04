@@ -8,6 +8,8 @@ from aiohttp import web
 clients = {}
 # 儲存配對狀態 {websocket: opponent_websocket}
 matches = {}
+# 儲存雙方 rematch 提案 {frozenset({ws, opponent}): set([ws_that_requested])}
+rematch_proposals = {}
 # 房間管理 {room_id: room_info dict (包含公開欄位，以及內部欄位 '_host' 指向 websocket)}
 rooms = {}
 
@@ -83,6 +85,9 @@ async def websocket_handler(request):
                         # 登記配對
                         matches[host_ws] = ws
                         matches[ws] = host_ws
+                        # 清除舊的 rematch 提案（如果有的話）
+                        key = frozenset({host_ws, ws})
+                        rematch_proposals.pop(key, None)
 
                         # 通知雙方配對成功
                         await host_ws.send_json({
@@ -121,11 +126,51 @@ async def websocket_handler(request):
                         await opponent.send_json({
                             "type": "win_game"
                         })
-                elif data['type'] == 'attack':
+                elif data["type"] == "attack":
                     if ws in matches:
                         opponent = matches[ws]
                         # 直接轉發給對手
                         await opponent.send_str(msg.data)
+
+                elif data["type"] == "rematch":
+                    # 提案重新對戰：必須雙方都送出 rematch 才會啟動
+                    if ws in matches:
+                        opponent = matches[ws]
+                        key = frozenset({ws, opponent})
+                        reqs = rematch_proposals.setdefault(key, set())
+                        reqs.add(ws)
+
+                        # 通知對手有 rematch 提案（第一次發起會看到 offer）
+                        await opponent.send_json({
+                            "type": "rematch_offer"
+                        })
+
+                        # 如果雙方都同意（兩個請求都到），通知雙方開始 rematch 並清除狀態
+                        if len(reqs) == 2:
+                            rematch_proposals.pop(key, None)
+                            await opponent.send_json({"type": "rematch_start"})
+                            await ws.send_json({"type": "rematch_start"})
+
+                elif data["type"] == "leave":
+                    # 玩家主動離開：刪除配對、刪除自己所主持的房間，並通知相關對手與所有 clients
+                    # 1) 刪除配對並通知對手
+                    if ws in matches:
+                        opponent = matches[ws]
+                        if opponent in matches:
+                            del matches[opponent]
+                        del matches[ws]
+                        await opponent.send_json({"type": "opponent_left"})
+
+                        # 清除任何 rematch 提案
+                        key = frozenset({ws, opponent})
+                        rematch_proposals.pop(key, None)
+
+                    # 2) 刪除自己主持的房間並廣播 delete_success
+                    to_remove = [r for r, info in rooms.items() if info.get("_host") == ws]
+                    for r in to_remove:
+                        del rooms[r]
+                        for player in clients:
+                            await player.send_json({"type": "delete_success", "room_id": r})
                         
             elif msg.type == web.WSMsgType.ERROR:
                 print('ws connection closed with exception %s', ws.exception())
@@ -144,6 +189,11 @@ async def websocket_handler(request):
             if opponent in matches:
                 del matches[opponent]
             del matches[ws]
+
+        # 清除任何與此連線有關的 rematch 提案
+        to_remove_proposals = [k for k in rematch_proposals.keys() if ws in k]
+        for k in to_remove_proposals:
+            rematch_proposals.pop(k, None)
 
         if ws in clients:
             del clients[ws]
