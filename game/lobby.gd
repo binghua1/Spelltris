@@ -1,6 +1,8 @@
 extends Control
 
 var rooms = [] # 保存所有房間 {"name": "", "host": ""}
+@onready var skill_menu = $SkillSelect
+@onready var open_skill_btn = $MainLayout/HBoxContainer2/SkillButton
 
 func _ready():
 	# 連接按鈕事件 (Godot 4 使用 Callable)
@@ -105,3 +107,16 @@ func _on_join_room_pressed():
 	var room = rooms[index]
 	Network.send_join(room.room_id)
 	print("加入房間: %s，由 %s 建立" % [room.name, room.host])
+
+
+func _on_skill_button_pressed() -> void:
+	skill_menu.open_menu() # 呼叫 skill_select.gd 裡面的函數
+
+# 檢查技能是否選好 (這是守門員)
+func _check_skills_ready() -> bool:
+	# 檢查 Global 裡的技能數量 (假設你需要選 3 個)
+	if Global.selected_skills.size() < 3:
+		print("技能未完成，強制開啟選單")
+		skill_menu.open_menu() # 自動打開選單
+		return false # 回傳 false 代表「還沒準備好」
+	return true # 回傳 true 代表「通過」
