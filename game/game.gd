@@ -97,6 +97,10 @@ func _try_use_skill(slot_index):
 			board.Skill_Clear_Bottom(3)
 		Global.Skills.SEND_LINES:
 			board.Skill_Send_Lines(3)
+		Global.Skills.SWAP_FIELD:
+			board.Skill_Swap_Field()
+		Global.Skills.INVERT_SCR:
+			board.Skill_Invert_Screen(10.0) 
 		_:
 			pass
 	

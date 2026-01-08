@@ -13,6 +13,9 @@ signal attack_received(lines) # 收到對手攻擊行時發出
 signal rematch_offer()
 signal rematch_start()
 signal opponent_left()
+signal swap_grid_received(grid_data) # 收到交換場地請求
+signal swap_grid_response_received(grid_data) # 收到交換場地回應
+signal invert_screen_received(duration) # 收到畫面顛倒效果
 
 var socket = WebSocketPeer.new()
 var url = "wss://spelltris.onrender.com/ws"
@@ -75,6 +78,18 @@ func send_rematch():
 func send_leave():
 	send_packet("leave", {})
 
+# 交換場地：發送自己的 grid 給對手
+func send_swap_grid(grid_data):
+	send_packet("swap_grid", { "grid": grid_data })
+
+# 交換場地回應：對手收到後回傳自己的 grid
+func send_swap_grid_response(grid_data):
+	send_packet("swap_grid_response", { "grid": grid_data })
+
+# 畫面顛倒：發送給對手
+func send_invert_screen(duration: float):
+	send_packet("invert_screen", { "duration": duration })
+
 # --- 【新增】發送盤面同步 ---
 func send_sync(grid_data, hold, next_queue, type, cells, pos, ghost_pos):
 	# grid_data 已經在 board.gd 轉成 hex string 了，直接傳
@@ -106,6 +121,19 @@ func json2vecarray(arr) -> Array:
 	for v in arr:
 		out.append(Vector2i(v[0], v[1]))
 	return out
+
+# 輔助函式：將 hex string grid 轉換為 Color grid
+func _convert_grid(raw_grid) -> Array:
+	var converted_grid = []
+	for y in range(raw_grid.size()):
+		converted_grid.append([])
+		for x in range(raw_grid[y].size()):
+			var hex_str = raw_grid[y][x]
+			if hex_str == null:
+				converted_grid[y].append(null)
+			else:
+				converted_grid[y].append(Color(hex_str))
+	return converted_grid
 
 # 處理收到的訊息
 func handle_message(data):
@@ -156,6 +184,22 @@ func handle_message(data):
 	
 		"attack":
 			attack_received.emit(data.get("lines"))
+			
+		"swap_grid":
+			# 收到對手的 grid，轉換為 Color 物件
+			var raw_grid = data.get("grid")
+			var converted_grid = _convert_grid(raw_grid)
+			swap_grid_received.emit(converted_grid)
+			
+		"swap_grid_response":
+			# 收到對手回傳的 grid
+			var raw_grid = data.get("grid")
+			var converted_grid = _convert_grid(raw_grid)
+			swap_grid_response_received.emit(converted_grid)
+			
+		"invert_screen":
+			var duration = data.get("duration", 5.0)
+			invert_screen_received.emit(duration)
 			
 		"rematch_offer":
 			rematch_offer.emit()

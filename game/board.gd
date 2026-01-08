@@ -98,6 +98,10 @@ var my_score = 0
 var opponent_score = 0
 const WIN_SCORE = 3
 
+# 畫面顛倒效果
+var is_screen_inverted = false
+var invert_timer = 0.0
+
 signal game_over(game_status)
 
 func Cell(p, b=Vector2i(0, 0)) -> Rect2:
@@ -107,6 +111,13 @@ func Opp_Cell(p, b=Vector2i(0, 0)) -> Rect2:
 	return Rect2(OPPONENT_BIAS.x + b.x + p.y * CELL_SIZE, OPPONENT_BIAS.y + b.y + p.x * CELL_SIZE, CELL_SIZE, CELL_SIZE)
 
 func _draw() -> void:
+	# 如果畫面顛倒，設定變換矩陣
+	if is_screen_inverted:
+		var center_x = BIAS.x + (COLS * CELL_SIZE) / 2.0
+		var center_y = BIAS.y + (ROWS * CELL_SIZE) / 2.0
+		# 將畫面繞著自己盤面中心旋轉 180 度
+		draw_set_transform(Vector2(0, center_y * 2), 0, Vector2(1, -1))
+	
 	# BackGround & Placed Tetromino
 	for y in range(ROWS):
 		for x in range(COLS):
@@ -165,6 +176,33 @@ func _draw() -> void:
 				b.x -= CELL_SIZE / 2.0
 			b += Vector2i(CELL_SIZE * (COLS + 5), CELL_SIZE * i * 3 - (area.y - CELL_SIZE * 3) / 2.0)
 			draw_rect(Cell(c, b), COLOR[seven_bag[i]])
+
+	#var bar_gap = 10
+	var max_visible_lines = 17
+	
+	var bar_width = 20
+	var bar_x = BIAS.x - bar_width
+	var bar_bottom_y = BIAS.y + ROWS * CELL_SIZE 
+	var full_bar_height = max_visible_lines * CELL_SIZE 
+	var full_bar_y = bar_bottom_y - full_bar_height 
+	draw_rect(Rect2(bar_x, full_bar_y, bar_width, full_bar_height), Color.WHITE, false, 2)
+	if incoming_attack_lines > 0:
+		# cal height
+		var visible_lines = min(incoming_attack_lines, max_visible_lines)
+		var fill_height = visible_lines * CELL_SIZE
+		var fill_y = bar_bottom_y - fill_height 
+		var bar_color = Color.GREEN
+		if incoming_attack_lines >= 12:
+			bar_color = Color.RED
+		elif incoming_attack_lines >= 6:
+			bar_color = Color.ORANGE
+		elif incoming_attack_lines >= 3:
+			bar_color = Color.YELLOW
+		draw_rect(Rect2(bar_x, fill_y, bar_width, fill_height), bar_color)
+	# 這行以上的都會倒過來	
+	if is_screen_inverted:
+		draw_set_transform(Vector2.ZERO, 0, Vector2.ONE)
+	
 	### Enemy ############
 	for y in range(ROWS):
 		for x in range(COLS):
@@ -233,28 +271,6 @@ func _draw() -> void:
 	var font_size = 32
 	draw_string(font, Vector2(BIAS.x, BIAS.y + ROWS * CELL_SIZE + 40), "Lines: %d" % lines_cleared, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size)
 
-	var bar_width = 20
-	#var bar_gap = 10
-	var max_visible_lines = 17
-	
-	var bar_x = BIAS.x - bar_width
-	var bar_bottom_y = BIAS.y + ROWS * CELL_SIZE 
-	var full_bar_height = max_visible_lines * CELL_SIZE 
-	var full_bar_y = bar_bottom_y - full_bar_height 
-	draw_rect(Rect2(bar_x, full_bar_y, bar_width, full_bar_height), Color.WHITE, false, 2)
-	if incoming_attack_lines > 0:
-		# cal height
-		var visible_lines = min(incoming_attack_lines, max_visible_lines)
-		var fill_height = visible_lines * CELL_SIZE
-		var fill_y = bar_bottom_y - fill_height 
-		var bar_color = Color.GREEN
-		if incoming_attack_lines >= 12:
-			bar_color = Color.RED
-		elif incoming_attack_lines >= 6:
-			bar_color = Color.ORANGE
-		elif incoming_attack_lines >= 3:
-			bar_color = Color.YELLOW
-		draw_rect(Rect2(bar_x, fill_y, bar_width, fill_height), bar_color)
 	# Score
 	draw_string(font, Vector2(BIAS.x, BIAS.y - 20), "Score: %d" % my_score, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size)
 	draw_string(font, Vector2(OPPONENT_BIAS.x, OPPONENT_BIAS.y - 20), "Score: %d" % opponent_score, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size)
@@ -338,6 +354,58 @@ func Skill_Send_Lines(count: int) -> void:
 	if lines_to_send > 0:
 		Network.send_attack(lines_to_send)
 
+func Skill_Swap_Field() -> void:
+	# 發送自己的 grid 給對手，並請求交換
+	if not gaming:
+		return
+	var my_grid_data = []
+	for y in range(ROWS):
+		var row_data = []
+		for x in range(COLS):
+			if grid[y][x] == null: row_data.append(null)
+			else: row_data.append(grid[y][x].to_html())
+		my_grid_data.append(row_data)
+	Network.send_swap_grid(my_grid_data)
+
+func Skill_Invert_Screen(duration: float) -> void:
+	# 發送畫面顛倒給對手
+	if not gaming:
+		return
+	Network.send_invert_screen(duration)
+
+# 處理收到交換場地請求
+func _on_swap_grid_received(incoming_grid):
+	# 保存自己目前的 grid
+	var my_old_grid = []
+	for y in range(ROWS):
+		var row_data = []
+		for x in range(COLS):
+			if grid[y][x] == null: row_data.append(null)
+			else: row_data.append(grid[y][x].to_html())
+		my_old_grid.append(row_data)
+	
+	# 回傳自己的 grid 給對方
+	Network.send_swap_grid_response(my_old_grid)
+	
+	# 套用對方的 grid
+	for y in range(ROWS):
+		for x in range(COLS):
+			grid[y][x] = incoming_grid[y][x]
+	Send_Data()
+
+# 處理收到交換場地回應
+func _on_swap_grid_response_received(incoming_grid):
+	# 套用對方的 grid (這是發起者收到的回應)
+	for y in range(ROWS):
+		for x in range(COLS):
+			grid[y][x] = incoming_grid[y][x]
+	Send_Data()
+
+# 處理收到畫面顛倒效果
+func _on_invert_screen_received(duration):
+	is_screen_inverted = true
+	invert_timer = duration
+
 func _ready():
 	print("visible:", get_viewport().get_visible_rect().size)
 	print("board pos:", global_position)
@@ -352,11 +420,21 @@ func _ready():
 	Network.opponent_grid_updated.connect(_on_opponent_grid_updated)
 	Network.win_respond.connect(_on_win_respond)
 	Network.attack_received.connect(_on_attack_received)
+	Network.swap_grid_received.connect(_on_swap_grid_received)
+	Network.swap_grid_response_received.connect(_on_swap_grid_response_received)
+	Network.invert_screen_received.connect(_on_invert_screen_received)
 	print("正在連線到伺服器...")
 	if Network.socket.get_ready_state() != WebSocketPeer.STATE_OPEN:
 		Network.socket.connect_to_url(Network.url)
 
 func _process(delta):
+	# 處理畫面顛倒計時
+	if is_screen_inverted:
+		invert_timer -= delta
+		if invert_timer <= 0:
+			is_screen_inverted = false
+			invert_timer = 0.0
+	
 	if gaming:
 		drop_timer += delta
 		DROP_TIME = max(MIN_DROP_TIME, INITIAL_DROP_TIME - (lines_cleared * SPEED_DECAY))
