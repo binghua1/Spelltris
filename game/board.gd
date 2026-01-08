@@ -308,6 +308,36 @@ func Send_Data() -> void:
 	Network.send_sync(sync_data, hold, seven_bag.slice(0, show_next), type, cells, pos, ghost_pos)
 	# ------------------
 
+# 新技能寫在這裡
+func Skill_Seven_I() -> void:
+	# 將接下來的七個方塊改成 I
+	if not gaming:
+		return
+	while seven_bag.size() < 7:
+		seven_bag += Random_Shuffle([0, 1, 2, 3, 4, 5, 6], rng.randi())
+	for i in range(7):
+		seven_bag[i] = 0
+	Send_Data()
+
+func Skill_Clear_Bottom(count: int) -> void:
+	# 清除底部 count 行，不造成攻擊
+	if not gaming:
+		return
+	var lines_to_clear = clamp(count, 1, ROWS)
+	for times in range(lines_to_clear):
+		for y in range(ROWS - 1, 1, -1):
+			for x in range(COLS):
+				grid[y][x] = grid[y - 1][x]
+	Send_Data()
+
+func Skill_Send_Lines(count: int) -> void:
+	# 直接送給對手 count 行
+	if not gaming:
+		return
+	var lines_to_send = max(0, count)
+	if lines_to_send > 0:
+		Network.send_attack(lines_to_send)
+
 func _ready():
 	print("visible:", get_viewport().get_visible_rect().size)
 	print("board pos:", global_position)

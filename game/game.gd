@@ -88,8 +88,17 @@ func _try_use_skill(slot_index):
 	var skill_id = slot_skill_ids[slot_index]
 	var skill_name = Global.skill_info[skill_id]["name"]
 	print(">>> 發動技能 (Slot %d): %s" % [slot_index, skill_name])
-	
-	# TODO: 這裡未來要呼叫 Network 發送技能給對手，或改變自己的 Board
+
+	# 新技能寫在這裡
+	match skill_id:
+		Global.Skills.SEVEN_I:
+			board.Skill_Seven_I()
+		Global.Skills.CLEAR_BOT:
+			board.Skill_Clear_Bottom(3)
+		Global.Skills.SEND_LINES:
+			board.Skill_Send_Lines(3)
+		_:
+			pass
 	
 	# 4. 開始冷卻
 	current_cooldowns[slot_index] = max_cooldowns[slot_index]
