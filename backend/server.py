@@ -132,20 +132,8 @@ async def websocket_handler(request):
                         # 直接轉發給對手
                         await opponent.send_str(msg.data)
 
-                elif data["type"] == "swap_grid":
+                elif data["type"] == "skill":
                     # 交換場地：轉發給對手，讓對手用收到的 grid 替換自己的 grid，並把自己的 grid 傳回來
-                    if ws in matches:
-                        opponent = matches[ws]
-                        await opponent.send_str(msg.data)
-
-                elif data["type"] == "swap_grid_response":
-                    # 對手回傳自己的 grid，讓發起者使用
-                    if ws in matches:
-                        opponent = matches[ws]
-                        await opponent.send_str(msg.data)
-
-                elif data["type"] == "invert_screen":
-                    # 畫面顛倒：直接轉發給對手
                     if ws in matches:
                         opponent = matches[ws]
                         await opponent.send_str(msg.data)

@@ -98,9 +98,39 @@ var my_score = 0
 var opponent_score = 0
 const WIN_SCORE = 3
 
+# 加速效果
+var speed_up_rate = 1.0
+var is_speed_up = false
+var speed_up_timer = 0.0
+
+# 遮擋頂部效果
+var is_blind_top = false
+var blind_top_timer = 0.0
+var blind_top_lines = 0
+
+# 時間暫停效果
+var is_time_stop = false
+var time_stop_timer = 0.0
+
 # 畫面顛倒效果
 var is_screen_inverted = false
 var invert_timer = 0.0
+
+# 反彈效果
+var is_reflected = false
+var reflected_timer = 0.0
+
+# 無敵較果
+var is_invincible = false
+var invincible_timer = 0.0
+
+# 閃光彈
+var is_flashbang = false
+var flashbang_timer = 0.0
+
+# 遮擋預告效果
+var is_hide_next = false
+var hide_next_timer = 0.0
 
 signal game_over(game_status)
 
@@ -113,15 +143,16 @@ func Opp_Cell(p, b=Vector2i(0, 0)) -> Rect2:
 func _draw() -> void:
 	# 如果畫面顛倒，設定變換矩陣
 	if is_screen_inverted:
-		var center_x = BIAS.x + (COLS * CELL_SIZE) / 2.0
+		#var center_x = BIAS.x + (COLS * CELL_SIZE) / 2.0
 		var center_y = BIAS.y + (ROWS * CELL_SIZE) / 2.0
 		# 將畫面繞著自己盤面中心旋轉 180 度
 		draw_set_transform(Vector2(0, center_y * 2), 0, Vector2(1, -1))
-	
 	# BackGround & Placed Tetromino
 	for y in range(ROWS):
 		for x in range(COLS):
 			var color = Color(0.07, 0.07, 0.07) if (x + y) % 2 == 0 else Color(0.09, 0.09, 0.09)
+			if is_blind_top and y < blind_top_lines:
+				color = Color(0.2, 0.1, 0.2)
 			if grid[y][x] != null:
 				color = grid[y][x]
 			draw_rect(Cell(Vector2i(y, x)), color)
@@ -162,20 +193,21 @@ func _draw() -> void:
 				color.a = 0.7
 			draw_rect(Cell(c, b), color)
 	# Next
-	area.y = area.y * show_next
-	area_rect = Rect2(BIAS.x - area.x + CELL_SIZE * (COLS + 5), BIAS.y, area.x, area.y)
-	draw_rect(area_rect, Color.BLACK)
-	draw_rect(area_rect, Color.WHITE, false, 2)
-	for i in range(show_next):
-		for c in TYPE[seven_bag[i]]:
-			var b = Vector2i(- (CELL_SIZE + area.x) / 2, area.y / 2)
-			if seven_bag[i] == 0:
-				b.x -= CELL_SIZE / 2.0
-				b.y -= CELL_SIZE / 2.0
-			elif seven_bag[i] == 3:
-				b.x -= CELL_SIZE / 2.0
-			b += Vector2i(CELL_SIZE * (COLS + 5), CELL_SIZE * i * 3 - (area.y - CELL_SIZE * 3) / 2.0)
-			draw_rect(Cell(c, b), COLOR[seven_bag[i]])
+	if not is_hide_next:
+		area.y = area.y * show_next
+		area_rect = Rect2(BIAS.x - area.x + CELL_SIZE * (COLS + 5), BIAS.y, area.x, area.y)
+		draw_rect(area_rect, Color.BLACK)
+		draw_rect(area_rect, Color.WHITE, false, 2)
+		for i in range(show_next):
+			for c in TYPE[seven_bag[i]]:
+				var b = Vector2i(- (CELL_SIZE + area.x) / 2, area.y / 2)
+				if seven_bag[i] == 0:
+					b.x -= CELL_SIZE / 2.0
+					b.y -= CELL_SIZE / 2.0
+				elif seven_bag[i] == 3:
+					b.x -= CELL_SIZE / 2.0
+				b += Vector2i(CELL_SIZE * (COLS + 5), CELL_SIZE * i * 3 - (area.y - CELL_SIZE * 3) / 2.0)
+				draw_rect(Cell(c, b), COLOR[seven_bag[i]])
 
 	#var bar_gap = 10
 	var max_visible_lines = 17
@@ -275,6 +307,19 @@ func _draw() -> void:
 	draw_string(font, Vector2(BIAS.x, BIAS.y - 20), "Score: %d" % my_score, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size)
 	draw_string(font, Vector2(OPPONENT_BIAS.x, OPPONENT_BIAS.y - 20), "Score: %d" % opponent_score, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size)
 	
+	if is_flashbang:
+		var alpha = flashbang_timer / 12.0
+		var color := Color(1, 1, 1, alpha)
+
+		draw_rect(
+			Rect2(
+				Vector2i.ZERO,
+				get_viewport().get_visible_rect().size / global_scale
+			),
+			color,
+			true
+		)
+	
 func Reset(reset_scores = true) -> void:
 	grid = []
 	for y in range(ROWS):
@@ -334,26 +379,7 @@ func Skill_Seven_I() -> void:
 	for i in range(7):
 		seven_bag[i] = 0
 	Send_Data()
-
-func Skill_Clear_Bottom(count: int) -> void:
-	# 清除底部 count 行，不造成攻擊
-	if not gaming:
-		return
-	var lines_to_clear = clamp(count, 1, ROWS)
-	for times in range(lines_to_clear):
-		for y in range(ROWS - 1, 1, -1):
-			for x in range(COLS):
-				grid[y][x] = grid[y - 1][x]
-	Send_Data()
-
-func Skill_Send_Lines(count: int) -> void:
-	# 直接送給對手 count 行
-	if not gaming:
-		return
-	var lines_to_send = max(0, count)
-	if lines_to_send > 0:
-		Network.send_attack(lines_to_send)
-
+	
 func Skill_Swap_Field() -> void:
 	# 發送自己的 grid 給對手，並請求交換
 	if not gaming:
@@ -366,12 +392,74 @@ func Skill_Swap_Field() -> void:
 			else: row_data.append(grid[y][x].to_html())
 		my_grid_data.append(row_data)
 	Network.send_swap_grid(my_grid_data)
+	
+func Skill_Speed_Up(duration: float, rate: float) -> void:
+	if not gaming:
+		return
+	Network.send_speed_up(duration, rate)
+	
+func Skill_Blind_Top(duration: float, count: int) -> void:
+	if not gaming:
+		return
+	Network.send_blind_top(duration, count)
 
+func Skill_Invert_LR() -> void:
+	if not gaming:
+		return
+	Network.send_invert_lr()
+
+func Skill_Stop_Opponent(duration: float) -> void:
+	if not gaming:
+		return
+	Network.send_stop_opponent(duration)
+	
+func Skill_Reflect(duration: float) -> void:
+	if not gaming:
+		return
+	is_reflected = true
+	reflected_timer = duration
+	
+func Skill_Invincible(duration: float) -> void:
+	if not gaming:
+		return
+	is_invincible = true
+	invincible_timer = duration
+	
 func Skill_Invert_Screen(duration: float) -> void:
 	# 發送畫面顛倒給對手
 	if not gaming:
 		return
 	Network.send_invert_screen(duration)
+	
+func Skill_Send_Lines(count: int) -> void:
+	# 直接送給對手 count 行
+	if not gaming:
+		return
+	var lines_to_send = max(0, count)
+	if lines_to_send > 0:
+		Network.send_attack(lines_to_send)
+
+func Skill_Clear_Bottom(count: int) -> void:
+	# 清除底部 count 行，不造成攻擊
+	if not gaming:
+		return
+	var lines_to_clear = clamp(count, 1, ROWS)
+	for times in range(lines_to_clear):
+		for y in range(ROWS - 1, 1, -1):
+			for x in range(COLS):
+				grid[y][x] = grid[y - 1][x]
+	Send_Data()
+	
+func Skill_FlashBang(duration: float) -> void:
+	if not gaming:
+		return
+	Network.send_flashbang(duration)
+	
+
+func Skill_Hide_Next(duration: float) -> void:
+	if not gaming:
+		return
+	Network.send_hide_next(duration)
 
 # 處理收到交換場地請求
 func _on_swap_grid_received(incoming_grid):
@@ -400,11 +488,40 @@ func _on_swap_grid_response_received(incoming_grid):
 		for x in range(COLS):
 			grid[y][x] = incoming_grid[y][x]
 	Send_Data()
-
+	
+func _on_speed_up_received(duration):
+	is_speed_up = true
+	speed_up_timer = duration
+	speed_up_rate = 1.5
+	
+func _on_blind_top_received(duration, lines):
+	is_blind_top = true
+	blind_top_timer = duration
+	blind_top_lines = lines
+	
+func _on_invert_lr_received():
+	for y in range(ROWS):
+		for x in range(int(COLS/2.0)):
+			var temp = grid[y][x]
+			grid[y][x] = grid[y][COLS - x - 1]
+			grid[y][COLS - x - 1] = temp
+			
+func _on_freeze_received(duration):
+	is_time_stop = true
+	time_stop_timer = duration
+	
 # 處理收到畫面顛倒效果
 func _on_invert_screen_received(duration):
 	is_screen_inverted = true
 	invert_timer = duration
+	
+func _on_flashbang_received(duration):
+	is_flashbang = true
+	flashbang_timer = duration
+	
+func _on_hide_next_received(duration):
+	is_hide_next = true
+	hide_next_timer = duration
 
 func _ready():
 	print("visible:", get_viewport().get_visible_rect().size)
@@ -422,125 +539,175 @@ func _ready():
 	Network.attack_received.connect(_on_attack_received)
 	Network.swap_grid_received.connect(_on_swap_grid_received)
 	Network.swap_grid_response_received.connect(_on_swap_grid_response_received)
+	Network.speed_up_received.connect(_on_speed_up_received)
+	Network.blind_top_received.connect(_on_blind_top_received)
+	Network.invert_lr_received.connect(_on_invert_lr_received)
+	Network.freeze_received.connect(_on_freeze_received)
 	Network.invert_screen_received.connect(_on_invert_screen_received)
+	Network.flashbang_received.connect(_on_flashbang_received)
+	Network.hide_next_received.connect(_on_hide_next_received)
 	print("正在連線到伺服器...")
 	if Network.socket.get_ready_state() != WebSocketPeer.STATE_OPEN:
 		Network.socket.connect_to_url(Network.url)
 
 func _process(delta):
-	# 處理畫面顛倒計時
-	if is_screen_inverted:
-		invert_timer -= delta
-		if invert_timer <= 0:
-			is_screen_inverted = false
-			invert_timer = 0.0
-	
 	if gaming:
-		drop_timer += delta
-		DROP_TIME = max(MIN_DROP_TIME, INITIAL_DROP_TIME - (lines_cleared * SPEED_DECAY))
-		if drop_timer > DROP_TIME:
-			Fall()
-			drop_timer = 0
-		if horiz_dir != 0:
-			horiz_time -= delta
-			if horiz_time <= 0:
-				Move(horiz_dir)
-				horiz_time = BUTTON_REPEAT
-		if verti_dir != 0:
-			verti_time -= delta
-			if verti_time <= 0:
-				Drop()
-				verti_time = BUTTON_REPEAT
-		if spin_dir != 0:
-			spin_time -= delta
-			if spin_time <= 0:
-				Rotate(spin_dir)
-				spin_time = BUTTON_REPEAT
+		if not is_time_stop:
+			drop_timer += delta
+			DROP_TIME = max(MIN_DROP_TIME, INITIAL_DROP_TIME - (lines_cleared * SPEED_DECAY)) * speed_up_rate
+			if drop_timer > DROP_TIME:
+				Fall()
+				drop_timer = 0
+			if horiz_dir != 0:
+				horiz_time -= delta
+				if horiz_time <= 0:
+					Move(horiz_dir)
+					horiz_time = BUTTON_REPEAT
+			if verti_dir != 0:
+				verti_time -= delta
+				if verti_time <= 0:
+					Drop()
+					verti_time = BUTTON_REPEAT
+			if spin_dir != 0:
+				spin_time -= delta
+				if spin_time <= 0:
+					Rotate(spin_dir)
+					spin_time = BUTTON_REPEAT
+					
+			if OnGround():
+				if not is_on_ground:
+					is_on_ground = true
+					lock_timer = 0.0
+			else:
+				is_on_ground = false
+			if is_on_ground:
+				lock_timer += delta
+				if lock_timer > LOCK_DELAY - 0.03 * op_times:
+					Lock()
 				
-		if OnGround():
-			if not is_on_ground:
-				is_on_ground = true
-				lock_timer = 0.0
-		else:
-			is_on_ground = false
-		if is_on_ground:
-			lock_timer += delta
-			if lock_timer > LOCK_DELAY - 0.03 * op_times:
-				Lock()
+		# 處理畫面顛倒計時
+		if is_screen_inverted:
+			invert_timer -= delta
+			if invert_timer <= 0:
+				is_screen_inverted = false
+				invert_timer = 0.0
+		
+		if is_speed_up:
+			speed_up_timer -= delta
+			if speed_up_timer <= 0:
+				is_speed_up = false
+				speed_up_timer = 0.0
+				speed_up_rate = 1.0
+				
+		if is_blind_top:
+			blind_top_timer -= delta
+			if blind_top_timer <= 0:
+				is_blind_top = false
+				blind_top_timer = 0.0
+		
+		if is_time_stop:
+			time_stop_timer -= delta
+			if time_stop_timer <= 0:
+				is_time_stop = false
+				time_stop_timer = 0.0
+				
+		if is_reflected:
+			reflected_timer -= delta
+			if reflected_timer <= 0:
+				is_reflected = false
+				reflected_timer = 0.0
+				
+		if is_invincible:
+			invincible_timer -= delta
+			if invincible_timer <= 0:
+				is_invincible = false
+				invincible_timer = 0.0
+				
+		if is_flashbang:
+			flashbang_timer -= delta
+			if flashbang_timer <= 0:
+				is_flashbang = false
+				flashbang_timer = 0.0
+				
+		if is_hide_next:
+			hide_next_timer -= delta
+			if hide_next_timer <= 0:
+				is_hide_next = false
+				hide_next_timer = 0.0
+		
 		Ghost()
 	queue_redraw()
 
 func _input(e):
 	if gaming:
-		if e.is_action_pressed("SPACE"):
-			Hard_Drop()
-		elif e.is_action_pressed("ui_left"):
-			horiz_dir = -1
-			horiz_time = BUTTON_DELAY
-			if is_on_ground and op_times < OPERATION_LIMIT:
-				lock_timer = 0.0
-				op_times += 1
-			Move(-1)
-		elif e.is_action_released("ui_left"):
-			if horiz_dir == -1:
-				horiz_dir = 0
-		elif e.is_action_pressed("ui_right"):
-			horiz_dir = 1
-			horiz_time = BUTTON_DELAY
-			if is_on_ground and op_times < OPERATION_LIMIT:
-				lock_timer = 0.0
-				op_times += 1
-			Move(1)
-		elif e.is_action_released("ui_right"):
-			if horiz_dir == 1:
-				horiz_dir = 0
-		elif e.is_action_pressed("ui_down"):
-			verti_dir = 1
-			verti_time = BUTTON_DELAY
-			Drop()
-		elif e.is_action_released("ui_down"):
-			if verti_dir == 1:
-				verti_dir = 0
-		elif e.is_action_pressed("x") or e.is_action_pressed("ui_up"):
-			spin_dir = 1
-			spin_time = BUTTON_DELAY
-			if is_on_ground and op_times < OPERATION_LIMIT:
-				lock_timer = 0.0
-				op_times += 1
-			Rotate(1)
-		elif e.is_action_released("x") or e.is_action_released("ui_up"):
-			if spin_dir == 1:
-				spin_dir = 0
-		elif e.is_action_pressed("z"):
-			spin_dir = -1
-			spin_time = BUTTON_DELAY
-			if is_on_ground and op_times < OPERATION_LIMIT:
-				lock_timer = 0.0
-				op_times += 1
-			Rotate(-1)
-		elif e.is_action_released("z"):
-			if spin_dir == -1:
-				spin_dir = 0
-		elif e.is_action_pressed("c"):
-			if not is_holded:
-				if hold == null:
-					hold = type
-					Spawn()
-				else:
-					var temp = type
-					type = hold
-					hold = temp
-					pos = Vector2i(0, 5)
-					dir = 0
-					cells = TYPE[type]
-					op_times = 0
-					is_on_ground = OnGround()
-					if Collide(pos, cells):
-						HandleLoss()
-				is_holded = true
-				Send_Data()
-	#if e.is_action_pressed("r"):
-		#Reset()
+		if not is_time_stop:
+			if e.is_action_pressed("SPACE"):
+				Hard_Drop()
+			elif e.is_action_pressed("ui_left"):
+				horiz_dir = -1
+				horiz_time = BUTTON_DELAY
+				if is_on_ground and op_times < OPERATION_LIMIT:
+					lock_timer = 0.0
+					op_times += 1
+				Move(-1)
+			elif e.is_action_released("ui_left"):
+				if horiz_dir == -1:
+					horiz_dir = 0
+			elif e.is_action_pressed("ui_right"):
+				horiz_dir = 1
+				horiz_time = BUTTON_DELAY
+				if is_on_ground and op_times < OPERATION_LIMIT:
+					lock_timer = 0.0
+					op_times += 1
+				Move(1)
+			elif e.is_action_released("ui_right"):
+				if horiz_dir == 1:
+					horiz_dir = 0
+			elif e.is_action_pressed("ui_down"):
+				verti_dir = 1
+				verti_time = BUTTON_DELAY
+				Drop()
+			elif e.is_action_released("ui_down"):
+				if verti_dir == 1:
+					verti_dir = 0
+			elif e.is_action_pressed("x") or e.is_action_pressed("ui_up"):
+				spin_dir = 1
+				spin_time = BUTTON_DELAY
+				if is_on_ground and op_times < OPERATION_LIMIT:
+					lock_timer = 0.0
+					op_times += 1
+				Rotate(1)
+			elif e.is_action_released("x") or e.is_action_released("ui_up"):
+				if spin_dir == 1:
+					spin_dir = 0
+			elif e.is_action_pressed("z"):
+				spin_dir = -1
+				spin_time = BUTTON_DELAY
+				if is_on_ground and op_times < OPERATION_LIMIT:
+					lock_timer = 0.0
+					op_times += 1
+				Rotate(-1)
+			elif e.is_action_released("z"):
+				if spin_dir == -1:
+					spin_dir = 0
+			elif e.is_action_pressed("c"):
+				if not is_holded:
+					if hold == null:
+						hold = type
+						Spawn()
+					else:
+						var temp = type
+						type = hold
+						hold = temp
+						pos = Vector2i(0, 5)
+						dir = 0
+						cells = TYPE[type]
+						op_times = 0
+						is_on_ground = OnGround()
+						if Collide(pos, cells):
+							HandleLoss()
+					is_holded = true
+					Send_Data()
 		
 func Random_Shuffle(arr, _seed) -> Array:
 	var RNG = RandomNumberGenerator.new()
@@ -644,8 +811,7 @@ func Drop() -> void:
 		pos = next_pos
 		last_rotated = false # 下落後重置旋轉標記
 		Send_Data()
-		
-	
+
 func Hard_Drop() -> void:
 	while not Collide(pos, cells):
 		pos.x += 1
@@ -737,7 +903,6 @@ func Eliminate_Line():
 		grid[y] = grid[ny]
 		grid[ny] = temp
 	
-	
 func _on_opponent_grid_updated(new_grid_data, new_hold, new_next, new_type, new_cells, new_pos, new_ghost_pos):
 	# 後端傳來的是字串或陣列，我們需要轉回顏色
 	# 這裡假設傳來的是顏色 hex string 陣列
@@ -759,7 +924,11 @@ func _on_win_respond():
 
 func _on_attack_received(lines):
 	print("Received attack: ", lines)
-	incoming_attack_lines += lines
+	if is_reflected:
+		lines = int(lines / 2.0)
+		Network.send_attack(lines)
+	if not is_invincible:
+		incoming_attack_lines += lines
 
 func add_garbage_lines(count):
 	# 將現有方塊上移

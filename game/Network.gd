@@ -15,7 +15,13 @@ signal rematch_start()
 signal opponent_left()
 signal swap_grid_received(grid_data) # 收到交換場地請求
 signal swap_grid_response_received(grid_data) # 收到交換場地回應
+signal speed_up_received(duration)
+signal blind_top_received(duration, lines)
+signal invert_lr_received()
+signal freeze_received(duration)
 signal invert_screen_received(duration) # 收到畫面顛倒效果
+signal flashbang_received(duration)
+signal hide_next_received(duration)
 
 var socket = WebSocketPeer.new()
 var url = "wss://spelltris.onrender.com/ws"
@@ -80,15 +86,33 @@ func send_leave():
 
 # 交換場地：發送自己的 grid 給對手
 func send_swap_grid(grid_data):
-	send_packet("swap_grid", { "grid": grid_data })
+	send_packet("skill", { "skill": "swap_grid", "grid": grid_data })
 
 # 交換場地回應：對手收到後回傳自己的 grid
 func send_swap_grid_response(grid_data):
-	send_packet("swap_grid_response", { "grid": grid_data })
+	send_packet("skill", { "skill": "swap_grid_response", "grid": grid_data })
 
+func send_speed_up(duration: float, rate: float):
+	send_packet("skill", { "skill": "speed_up", "duration": duration, "rate": rate })
+	
+func send_blind_top(duration: float, count: int):
+	send_packet("skill", { "skill": "blind_top", "duration": duration, "lines": count})
+	
+func send_invert_lr():
+	send_packet("skill", { "skill": "invert_lr" })
+	
+func send_stop_opponent(duration: float):
+	send_packet("skill", { "skill": "freeze", "duration": duration })
+	
 # 畫面顛倒：發送給對手
 func send_invert_screen(duration: float):
-	send_packet("invert_screen", { "duration": duration })
+	send_packet("skill", { "skill": "invert_screen", "duration": duration })
+	
+func send_flashbang(duration: float):
+	send_packet("skill", { "skill": "flashbang", "duration": duration })
+	
+func send_hide_next(duration: float):
+	send_packet("skill", { "skill": "hide_next", "duration": duration })
 
 # --- 【新增】發送盤面同步 ---
 func send_sync(grid_data, hold, next_queue, type, cells, pos, ghost_pos):
@@ -185,21 +209,48 @@ func handle_message(data):
 		"attack":
 			attack_received.emit(data.get("lines"))
 			
-		"swap_grid":
-			# 收到對手的 grid，轉換為 Color 物件
-			var raw_grid = data.get("grid")
-			var converted_grid = _convert_grid(raw_grid)
-			swap_grid_received.emit(converted_grid)
-			
-		"swap_grid_response":
-			# 收到對手回傳的 grid
-			var raw_grid = data.get("grid")
-			var converted_grid = _convert_grid(raw_grid)
-			swap_grid_response_received.emit(converted_grid)
-			
-		"invert_screen":
-			var duration = data.get("duration", 5.0)
-			invert_screen_received.emit(duration)
+		"skill":
+			match data.skill:
+				"swap_grid":
+					# 收到對手的 grid，轉換為 Color 物件
+					var raw_grid = data.get("grid")
+					var converted_grid = _convert_grid(raw_grid)
+					swap_grid_received.emit(converted_grid)
+					
+				"swap_grid_response":
+					# 收到對手回傳的 grid
+					var raw_grid = data.get("grid")
+					var converted_grid = _convert_grid(raw_grid)
+					swap_grid_response_received.emit(converted_grid)
+					
+				"speed_up":
+					var duration = data.get("duration")
+					var rate = data.get("rate")
+					speed_up_received.emit(duration, rate)
+				
+				"blind_top":
+					var duration = data.get("duration")
+					var lines = data.get("lines")
+					blind_top_received.emit(duration, lines)
+					
+				"invert_lr":
+					invert_lr_received.emit()
+					
+				"freeze":
+					var duration = data.get("duration")
+					freeze_received.emit(duration)
+					
+				"invert_screen":
+					var duration = data.get("duration")
+					invert_screen_received.emit(duration)
+					
+				"flashbang":
+					var duration = data.get("duration")
+					flashbang_received.emit(duration)
+					
+				"hide_next":
+					var duration = data.get("duration")
+					hide_next_received.emit(duration)
 			
 		"rematch_offer":
 			rematch_offer.emit()

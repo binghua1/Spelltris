@@ -93,14 +93,30 @@ func _try_use_skill(slot_index):
 	match skill_id:
 		Global.Skills.SEVEN_I:
 			board.Skill_Seven_I()
-		Global.Skills.CLEAR_BOT:
-			board.Skill_Clear_Bottom(3)
-		Global.Skills.SEND_LINES:
-			board.Skill_Send_Lines(3)
 		Global.Skills.SWAP_FIELD:
 			board.Skill_Swap_Field()
+		Global.Skills.SPEED_UP:
+			board.Skill_Speed_Up(10.0, 0.5)
+		Global.Skills.BLIND_TOP:
+			board.Skill_Blind_Top(10.0, 3)
+		Global.Skills.INVERT_LR:
+			board.Skill_Invert_LR()
+		Global.Skills.STOP_OPP:
+			board.Skill_Stop_Opponent(5.0)
+		Global.Skills.REFLECT:
+			board.Skill_Reflect(5.0)
+		Global.Skills.INVINCIBLE:
+			board.Skill_Invincible(5.0)
 		Global.Skills.INVERT_SCR:
 			board.Skill_Invert_Screen(10.0) 
+		Global.Skills.SEND_LINES:
+			board.Skill_Send_Lines(3)
+		Global.Skills.CLEAR_BOT:
+			board.Skill_Clear_Bottom(3)
+		Global.Skills.FLASHBANG:
+			board.Skill_FlashBang(12.0)
+		Global.Skills.HIDE_NEXT:
+			board.Skill_Hide_Next(10.0)
 		_:
 			pass
 	
