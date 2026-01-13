@@ -11,8 +11,9 @@ config_version=5
 [application]
 
 config/name="game"
-run/main_scene="uid://yii5bh1uhf4q"
+run/main_scene="uid://b20r7ucu5bo00"
 config/features=PackedStringArray("4.5", "Forward Plus")
+run/low_processor_mode=true
 boot_splash/show_image=false
 config/icon="res://icon.svg"
 run/autoload_on_startup=false

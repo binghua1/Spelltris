@@ -571,6 +571,9 @@ func _process(delta):
 			if spin_dir != 0:
 				spin_time -= delta
 				if spin_time <= 0:
+					if is_on_ground and op_times < OPERATION_LIMIT:
+						lock_timer = 0.0
+						op_times += 1
 					Rotate(spin_dir)
 					spin_time = BUTTON_REPEAT
 					
@@ -582,7 +585,7 @@ func _process(delta):
 				is_on_ground = false
 			if is_on_ground:
 				lock_timer += delta
-				if lock_timer > LOCK_DELAY - 0.03 * op_times:
+				if lock_timer > LOCK_DELAY - 0.033 * op_times:
 					Lock()
 				
 		# 處理畫面顛倒計時
