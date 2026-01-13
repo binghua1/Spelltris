@@ -342,6 +342,9 @@ func Reset(reset_scores = true) -> void:
 	last_rotated = false
 	total_gametime = 0
 	DROP_TIME = INITIAL_DROP_TIME
+	horiz_dir = 0
+	verti_dir = 0
+	spin_dir = 0
 	if reset_scores:
 		my_score = 0
 		opponent_score = 0
