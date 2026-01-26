@@ -129,6 +129,11 @@ var invincible_timer = 0.0
 # 閃光彈
 var is_flashbang = false
 var flashbang_timer = 0.0
+var flashbang_duration = 12.0  
+var flashbang_texture: Texture2D = null
+var show_flashbang_image = false  # 50% 機率顯示圖片
+const FLASHBANG_IMAGE_DELAY = 0  # 圖片延遲出現時間
+const FLASHBANG_FADE_IN_TIME = 2.0  
 
 # 遮擋預告效果
 var is_hide_next = false
@@ -310,17 +315,38 @@ func _draw() -> void:
 	draw_string(font, Vector2(OPPONENT_BIAS.x, OPPONENT_BIAS.y - 20), "Score: %d" % opponent_score, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size)
 	
 	if is_flashbang:
-		var alpha = flashbang_timer / 12.0
+		var alpha = flashbang_timer / flashbang_duration
 		var color := Color(1, 1, 1, alpha)
+		var screen_size = get_viewport().get_visible_rect().size / global_scale
 
 		draw_rect(
 			Rect2(
 				Vector2i.ZERO,
-				get_viewport().get_visible_rect().size / global_scale
+				screen_size
 			),
 			color,
 			true
 		)
+		
+		# 圓神
+		var elapsed_time = flashbang_duration - flashbang_timer
+		if flashbang_texture != null and show_flashbang_image and elapsed_time >= FLASHBANG_IMAGE_DELAY:
+			# 圖片已顯示的時間
+			var image_elapsed = elapsed_time - FLASHBANG_IMAGE_DELAY
+			var image_total = flashbang_duration - FLASHBANG_IMAGE_DELAY
+			var image_alpha: float
+			
+			if image_elapsed < FLASHBANG_FADE_IN_TIME:
+				# 淡入階段：alpha 從 0 到 1
+				image_alpha = image_elapsed / FLASHBANG_FADE_IN_TIME
+			else:
+				# 淡出階段：alpha 從 1 到 0
+				var fade_out_total = image_total - FLASHBANG_FADE_IN_TIME
+				image_alpha = flashbang_timer / fade_out_total
+			
+			image_alpha = clamp(image_alpha, 0.0, 1.0)
+			# 將圖片縮放填滿整個畫面
+			draw_texture_rect(flashbang_texture, Rect2(Vector2.ZERO, screen_size), false, Color(1, 1, 1, image_alpha))
 	
 func Reset(reset_scores = true) -> void:
 	grid = []
@@ -525,6 +551,9 @@ func _on_invert_screen_received(duration):
 func _on_flashbang_received(duration):
 	is_flashbang = true
 	flashbang_timer = duration
+	flashbang_duration = duration  # 記錄總時長用於計算 alpha
+	# 50% 機率顯示圖片
+	show_flashbang_image = randf() < 0.5
 	
 func _on_hide_next_received(duration):
 	is_hide_next = true
@@ -534,6 +563,10 @@ func _ready():
 	print("visible:", get_viewport().get_visible_rect().size)
 	print("board pos:", global_position)
 	print("board scale:", global_scale)
+
+	if ResourceLoader.exists("res://genshin.png"):
+		flashbang_texture = load("res://genshin.png")
+	
 	Reset()
 	for y in range(ROWS):
 		opponent_grid.append([])
