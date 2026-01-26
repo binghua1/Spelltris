@@ -1,6 +1,7 @@
-[gd_scene load_steps=2 format=3 uid="uid://tavodcfudfxs"]
+[gd_scene load_steps=3 format=3 uid="uid://tavodcfudfxs"]
 
 [ext_resource type="Script" uid="uid://cjdu1k17h6ite" path="res://lobby.gd" id="1_ll2xe"]
+[ext_resource type="PackedScene" uid="uid://h4j0kkbst1jh" path="res://skillSelect.tscn" id="2_xrgmn"]
 
 [node name="Lobby" type="Control"]
 layout_mode = 3
@@ -10,6 +11,11 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_ll2xe")
+
+[node name="SkillSelect" parent="." instance=ExtResource("2_xrgmn")]
+visible = false
+z_index = 10
+layout_mode = 1
 
 [node name="MainLayout" type="VBoxContainer" parent="."]
 layout_mode = 1
@@ -62,8 +68,14 @@ text = "create"
 layout_mode = 2
 text = "join"
 
+[node name="SkillButton" type="Button" parent="MainLayout/HBoxContainer2"]
+layout_mode = 2
+text = "choose skill"
+metadata/_edit_use_anchors_ = true
+
 [node name="create_room_dialog" type="Window" parent="."]
 oversampling_override = 1.0
+position = Vector2i(0, 36)
 size = Vector2i(500, 300)
 
 [node name="VBoxContainer" type="VBoxContainer" parent="create_room_dialog"]
@@ -91,4 +103,32 @@ layout_mode = 2
 layout_mode = 2
 text = "confirm"
 
+[node name="waiting_for_match" type="Window" parent="."]
+oversampling_override = 1.0
+position = Vector2i(0, 36)
+size = Vector2i(200, 150)
+
+[node name="VBoxContainer" type="VBoxContainer" parent="waiting_for_match"]
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -68.5
+offset_top = -29.0
+offset_right = 68.5
+offset_bottom = 29.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Label" type="Label" parent="waiting_for_match/VBoxContainer"]
+layout_mode = 2
+text = "waiting for match"
+
+[node name="cancel" type="Button" parent="waiting_for_match/VBoxContainer"]
+layout_mode = 2
+text = "cancel"
+
+[connection signal="pressed" from="MainLayout/HBoxContainer2/SkillButton" to="." method="_on_skill_button_pressed"]
 [connection signal="close_requested" from="create_room_dialog" to="." method="_on_create_room_dialog_close_requested"]
+[connection signal="close_requested" from="waiting_for_match" to="." method="_on_waiting_for_match_close_requested"]

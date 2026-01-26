@@ -1,6 +1,14 @@
-[gd_scene load_steps=2 format=3 uid="uid://yii5bh1uhf4q"]
+[gd_scene load_steps=3 format=3 uid="uid://yii5bh1uhf4q"]
 
 [ext_resource type="Script" uid="uid://dndlkdvxxaquh" path="res://login.gd" id="1_cau7c"]
+
+[sub_resource type="LabelSettings" id="LabelSettings_3n56f"]
+line_spacing = 3.46
+paragraph_spacing = -0.16
+font_size = 100
+font_color = Color(1, 1, 0.2374612, 1)
+outline_size = 5
+shadow_size = 9
 
 [node name="Login" type="Control"]
 layout_mode = 3
@@ -18,12 +26,14 @@ anchor_left = 0.5
 anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
-offset_left = -20.0
-offset_top = -20.0
-offset_right = 20.0
-offset_bottom = 20.0
+offset_left = -75.0
+offset_top = -46.5
+offset_right = 75.0
+offset_bottom = 46.5
 grow_horizontal = 2
 grow_vertical = 2
+scale = Vector2(2, 2)
+metadata/_edit_group_ = true
 
 [node name="LineEdit" type="LineEdit" parent="VBoxContainer"]
 layout_mode = 2
@@ -35,5 +45,21 @@ text = "Start!"
 
 [node name="Label" type="Label" parent="VBoxContainer"]
 layout_mode = 2
+
+[node name="Label" type="Label" parent="."]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.513
+anchor_top = 0.5
+anchor_right = 0.513
+anchor_bottom = 0.5
+offset_left = -136.97601
+offset_top = -229.0
+offset_right = 219.02399
+offset_bottom = -129.0
+grow_horizontal = 2
+grow_vertical = 2
+text = "Spelltris"
+label_settings = SubResource("LabelSettings_3n56f")
 
 [connection signal="pressed" from="VBoxContainer/Button" to="." method="_on_button_pressed"]
