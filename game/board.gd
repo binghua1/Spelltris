@@ -86,6 +86,8 @@ var is_on_ground = false
 
 var gaming = true
 
+var nums_of_game := 1
+
 # 攻擊相關變數
 var lines_cleared = 0 # 累計消除的行數
 var incoming_attack_lines = 0 # 即將到來的攻擊行數
@@ -327,6 +329,7 @@ func Reset(reset_scores = true) -> void:
 		for x in range(COLS):
 			grid[y].append(null)
 	rng = RandomNumberGenerator.new()
+	rng_seed = 114514 * Global.room_id.to_int() - 1919810 * nums_of_game
 	rng.seed = rng_seed
 	seven_bag = []
 	Spawn()
@@ -342,6 +345,9 @@ func Reset(reset_scores = true) -> void:
 	last_rotated = false
 	total_gametime = 0
 	DROP_TIME = INITIAL_DROP_TIME
+	horiz_dir = 0
+	verti_dir = 0
+	spin_dir = 0
 	if reset_scores:
 		my_score = 0
 		opponent_score = 0
@@ -350,6 +356,7 @@ func Reset(reset_scores = true) -> void:
 func HandleLoss() -> void:
 	Network.send_game_end()
 	opponent_score += 1
+	nums_of_game += 1
 	if opponent_score >= WIN_SCORE:
 		gaming = false
 		game_over.emit("lose")
@@ -571,6 +578,9 @@ func _process(delta):
 			if spin_dir != 0:
 				spin_time -= delta
 				if spin_time <= 0:
+					if is_on_ground and op_times < OPERATION_LIMIT:
+						lock_timer = 0.0
+						op_times += 1
 					Rotate(spin_dir)
 					spin_time = BUTTON_REPEAT
 					
@@ -582,7 +592,7 @@ func _process(delta):
 				is_on_ground = false
 			if is_on_ground:
 				lock_timer += delta
-				if lock_timer > LOCK_DELAY - 0.03 * op_times:
+				if lock_timer > LOCK_DELAY - 0.033 * op_times:
 					Lock()
 				
 		# 處理畫面顛倒計時
@@ -916,6 +926,7 @@ func _on_opponent_grid_updated(new_grid_data, new_hold, new_next, new_type, new_
 	
 func _on_win_respond():
 	my_score += 1
+	nums_of_game += 1
 	if my_score >= WIN_SCORE:
 		gaming = false
 		game_over.emit("win")
